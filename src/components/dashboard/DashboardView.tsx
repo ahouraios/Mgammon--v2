@@ -44,6 +44,7 @@ import {
   TrendingUp,
   TrendingDown,
   Bell,
+  BarChart3,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -109,6 +110,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [settings, setSettings] = useState<CompanySettings>(() => StorageService.getSettings());
   const [timeStr, setTimeStr] = useState('');
   const [activeAlertTab, setActiveAlertTab] = useState<AlertFilterTab>('ALL');
+  const [dashboardTab, setDashboardTab] = useState<'REQUESTS' | 'PRESENCE' | 'TRENDS' | 'LOGS'>('REQUESTS');
   const [actionFeedback, setActionFeedback] = useState<{ text: string; success: boolean } | null>(null);
 
   // Quick Action Registration Modal State
@@ -518,46 +520,55 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       )}
 
       {/* ========================================================= */}
-      {/* 1. COMMAND HUB SCENIC HERO BANNER                         */}
+      {/* 1. ULTRA-COMPACT COMMAND STRIP (بنر کم‌ارتفاع و مدرن)     */}
       {/* ========================================================= */}
-      <div className="relative rounded-3xl overflow-hidden shadow-lg border border-slate-200/90 min-h-[170px] sm:min-h-[190px] flex flex-col justify-between p-5 sm:p-7 text-white">
-        {/* Background Image with Dark Vignette Overlay */}
+      <div className="relative rounded-2xl overflow-hidden shadow-xs border border-slate-200/90 p-2 sm:px-3.5 sm:py-2 text-white flex items-center justify-between gap-2.5">
         <div
-          className="absolute inset-0 bg-cover bg-center transition-all duration-500 scale-100"
+          className="absolute inset-0 bg-cover bg-center transition-all duration-500 opacity-25"
           style={{ backgroundImage: `url(${bannerUrl})` }}
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-900/75 to-slate-900/40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950" />
 
-        {/* Top bar inside banner: Greeting, Online Dot, Date & Live Clock */}
-        <div className="relative z-10 flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse ring-2 ring-emerald-400/40" />
-              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white drop-shadow-sm">
+        {/* Right Info: Live Status & Manager Greeting */}
+        <div className="relative z-10 flex items-center gap-2 min-w-0">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ring-2 ring-emerald-400/30 shrink-0" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h2 className="text-xs sm:text-sm font-black text-white truncate">
                 سلام، {currentUser?.name?.split(' (')[0] || 'جناب آقای نورایی'}
               </h2>
-              <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-white/15 text-indigo-100 border border-white/20 font-medium">
-                مدیریت ارشد کارگاه
+              <span className="text-[9px] px-1.5 py-0.2 rounded-md bg-white/10 text-indigo-200 border border-white/15 font-bold hidden xs:inline">
+                مدیریت کارگاه
               </span>
             </div>
-            
-            <p className="text-xs sm:text-sm text-slate-200/90 mt-1 font-medium drop-shadow-xs flex items-center gap-2 flex-wrap">
-              <span>امروز {shamsi.dayOfWeek}، {shamsi.day} {shamsi.monthName} {shamsi.year}</span>
-              <span className="text-slate-400">|</span>
+            <p className="text-[10px] text-slate-300 font-medium flex items-center gap-1 mt-0.5">
+              <span>{shamsi.dayOfWeek}، {shamsi.day} {shamsi.monthName}</span>
+              <span className="text-slate-500">•</span>
               <span className="font-mono text-emerald-300 font-bold tracking-wider">{timeStr}</span>
-              <span className="text-slate-400">|</span>
-              <span className="text-indigo-200">وضعیت کارگاه: شیفت فعال روزانه</span>
             </p>
           </div>
+        </div>
 
-          {/* Banner Upload Button on Host */}
+        {/* Left Info: Key Badges & Banner Camera Button */}
+        <div className="relative z-10 flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 font-mono text-[10px] sm:text-xs">
+            <span className="text-emerald-300 font-bold bg-emerald-500/20 px-2 py-0.5 rounded-lg border border-emerald-500/30">
+              {formatNumberFa(presentCount)} حاضر
+            </span>
+            {totalUrgentCount > 0 && (
+              <span className="text-rose-300 font-bold bg-rose-500/25 px-2 py-0.5 rounded-lg border border-rose-500/40 animate-pulse">
+                {formatNumberFa(totalUrgentCount)} اقدام فوری
+              </span>
+            )}
+          </div>
+
           <label
             htmlFor="dashboard-banner-upload"
-            className="self-start sm:self-auto px-3 py-1.5 bg-slate-900/70 hover:bg-slate-900/90 text-white/90 hover:text-white rounded-xl backdrop-blur-md border border-white/20 transition-all cursor-pointer flex items-center gap-2 text-xs font-bold shadow-xs shrink-0"
-            title="آپلود تصویر بنر اختصاصی کارگاه در هاست"
+            className="p-1 sm:px-2 sm:py-0.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/90 hover:text-white border border-white/15 transition-all cursor-pointer flex items-center gap-1 text-[10px] font-bold shadow-2xs shrink-0"
+            title="تغییر تصویر بنر کارگاه"
           >
-            <Camera className="w-3.5 h-3.5 text-indigo-300" />
-            <span>تغییر بنر کارگاه</span>
+            <Camera className="w-3.5 h-3.5 text-indigo-200" />
+            <span className="hidden sm:inline">بنر</span>
             <input
               id="dashboard-banner-upload"
               type="file"
@@ -567,111 +578,435 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             />
           </label>
         </div>
+      </div>
 
-        {/* Hero Footer: Workshop Metadata Strip */}
-        <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300 pt-4 border-t border-white/10">
-          <div className="flex items-center gap-4 flex-wrap">
-            <span className="flex items-center gap-1.5 text-slate-200">
-              <Building2 className="w-3.5 h-3.5 text-amber-400" />
-              <span>{settings.companyName || 'کارگاه صنایع چوب و تخته‌نرد ام.گامان'}</span>
-            </span>
-            <span className="hidden sm:inline text-slate-400">•</span>
-            <span className="text-slate-300 text-[11px]">
-              مشهد، بزرگراه آزادی، بلوار توس، توس ۱۴۲، حسین‌زاده ۸
-            </span>
+      {/* ========================================================= */}
+      {/* 2. PROMINENT KEY TELEMETRY & WORKSHOP PULSE (بخش‌های مهم)  */}
+      {/* ========================================================= */}
+      <div className="space-y-2.5">
+        {/* 4 Main Actionable Status Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+          {/* Card 1: Today's Live Presence */}
+          <div
+            onClick={() => onNavigate('attendance')}
+            className="bg-white hover:bg-blue-50/40 border border-slate-200/90 hover:border-blue-300 p-3 sm:p-3.5 rounded-2xl shadow-2xs hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between group"
+          >
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-slate-700 group-hover:text-blue-900 transition-colors">حضور امروز کارگاه</span>
+              <div className="w-7 h-7 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Activity className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-1.5">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono tracking-tight">
+                  {formatNumberFa(presentCount)}
+                </span>
+                <span className="text-xs text-slate-500 font-medium">از {formatNumberFa(totalEmployees)} نفر حاضر</span>
+              </div>
+              <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2 overflow-hidden">
+                <div
+                  className="bg-blue-600 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${totalEmployees > 0 ? (presentCount / totalEmployees) * 100 : 0}%` }}
+                />
+              </div>
+              <div className="text-[10px] text-slate-500 mt-1 flex items-center justify-between">
+                <span>{formatNumberFa(absentCount)} غایب</span>
+                <span className="text-amber-700 font-medium">{formatNumberFa(lateCount)} تاخیر</span>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3 text-[11px] font-mono">
-            <span className="text-emerald-300 font-bold bg-emerald-500/20 px-2 py-0.5 rounded-lg border border-emerald-500/30">
-              {formatNumberFa(presentCount)} حاضر در سالن
-            </span>
-            {totalUrgentCount > 0 && (
-              <span className="text-rose-300 font-bold bg-rose-500/20 px-2 py-0.5 rounded-lg border border-rose-500/30">
-                {formatNumberFa(totalUrgentCount)} اقدام فوری
+          {/* Card 2: Urgent Approvals */}
+          <div
+            onClick={() => setDashboardTab('REQUESTS')}
+            className={`border p-3 sm:p-3.5 rounded-2xl shadow-2xs hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between group ${
+              totalUrgentCount > 0
+                ? 'bg-rose-50/70 border-rose-200/90 hover:border-rose-400'
+                : 'bg-white border-slate-200/90 hover:border-emerald-300'
+            }`}
+          >
+            <div className="flex items-center justify-between text-xs">
+              <span className={`font-bold ${totalUrgentCount > 0 ? 'text-rose-950' : 'text-slate-700'}`}>اقدامات و تاییدات مدیر</span>
+              <div className={`w-7 h-7 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform ${
+                totalUrgentCount > 0 ? 'bg-rose-500 text-white animate-pulse' : 'bg-emerald-50 text-emerald-600'
+              }`}>
+                <Shield className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-1.5">
+              <div className="flex items-baseline gap-1.5">
+                <span className={`text-xl sm:text-2xl font-black font-mono tracking-tight ${totalUrgentCount > 0 ? 'text-rose-700' : 'text-slate-900'}`}>
+                  {formatNumberFa(totalUrgentCount)}
+                </span>
+                <span className="text-xs text-slate-500 font-medium">مورد منتظر اقدام</span>
+              </div>
+              <div className="text-[10px] mt-1.5 font-medium truncate flex items-center gap-1">
+                {totalUrgentCount > 0 ? (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping shrink-0" />
+                    <span className="text-rose-700 font-bold">نیاز به تایید و تسویه فوری</span>
+                  </>
+                ) : (
+                  <span className="text-emerald-700">✓ همه موارد تعیین‌تکلیف شدند</span>
+                )}
+              </div>
+              <span className="text-[9px] text-indigo-600 font-bold mt-1 block">بررسی در پیشخوان ←</span>
+            </div>
+          </div>
+
+          {/* Card 3: Pending Financial Obligations */}
+          <div
+            onClick={() => onNavigate('advances')}
+            className="bg-white hover:bg-amber-50/40 border border-slate-200/90 hover:border-amber-300 p-3 sm:p-3.5 rounded-2xl shadow-2xs hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between group"
+          >
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-slate-700 group-hover:text-amber-950 transition-colors">مطالبات مالی در انتظار</span>
+              <div className="w-7 h-7 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Receipt className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-1.5">
+              <div className="text-lg sm:text-xl font-black text-slate-900 font-mono tracking-tight truncate">
+                {formatCurrencyTomans(totalPendingFinancialAmount)}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-1 truncate">
+                {formatNumberFa(pendingExpenses.length)} فاکتور خرید + {formatNumberFa(pendingAdvances.length)} مساعده باز
+              </div>
+              <span className="text-[9px] text-amber-700 font-bold mt-1 block">تسویه و پرداخت ←</span>
+            </div>
+          </div>
+
+          {/* Card 4: SMS Gateway Status & Balance */}
+          <div
+            onClick={() => onNavigate('settings')}
+            className="bg-white hover:bg-indigo-50/40 border border-slate-200/90 hover:border-indigo-300 p-3 sm:p-3.5 rounded-2xl shadow-2xs hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between group"
+          >
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-slate-700 group-hover:text-indigo-950 transition-colors">درگاه پیامک کارگاه</span>
+              <div className="w-7 h-7 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <MessageSquare className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-1.5">
+              <div className="text-xs sm:text-sm font-black text-slate-900 truncate flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                <span className="truncate">
+                  {settings.smsProvider === 'MELIPAYAMAK' ? 'ملی‌پیامک (فعال)' :
+                   settings.smsProvider === 'IPPANEL_FARAZ' ? 'فراز اس‌ام‌اس (فعال)' :
+                   settings.smsProvider === 'GHASEDAK' ? 'قاصدک (فعال)' :
+                   settings.smsProvider === 'SMS_IR' ? 'SMS.ir (فعال)' :
+                   settings.smsProvider === 'CUSTOM' ? 'وب‌سرویس سفارشی' : 'کاوه‌نگار (فعال)'}
+                </span>
+              </div>
+              <div className="text-[10px] text-indigo-950 font-bold mt-1 truncate bg-indigo-50/80 px-2 py-0.5 rounded-lg border border-indigo-100">
+                {settings.smsLastBalance ? `مانده: ${settings.smsLastBalance}` : 'آماده ارسال اعلان تردد'}
+              </div>
+              <span className="text-[9px] text-slate-400 mt-1 block">تنظیمات پیامک ←</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Compact Secondary Stat Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div
+            onClick={() => onNavigate('attendance')}
+            className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 flex items-center justify-between cursor-pointer transition-colors"
+          >
+            <div className="flex items-center gap-1.5 min-w-0">
+              <UserX className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+              <span className="text-[11px] text-slate-600 truncate">غایبین:</span>
+            </div>
+            <span className="font-mono text-xs font-black text-rose-600 mr-1">{formatNumberFa(absentCount)} نفر</span>
+          </div>
+
+          <div
+            onClick={() => onNavigate('attendance')}
+            className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 flex items-center justify-between cursor-pointer transition-colors"
+          >
+            <div className="flex items-center gap-1.5 min-w-0">
+              <ClockAlert className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <span className="text-[11px] text-slate-600 truncate">تاخیر ورود:</span>
+            </div>
+            <span className="font-mono text-xs font-black text-amber-700 mr-1">{formatNumberFa(lateCount)} نفر</span>
+          </div>
+
+          <div
+            onClick={() => onNavigate('leaves')}
+            className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 flex items-center justify-between cursor-pointer transition-colors"
+          >
+            <div className="flex items-center gap-1.5 min-w-0">
+              <PlaneTakeoff className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+              <span className="text-[11px] text-slate-600 truncate">مرخصی مصوب:</span>
+            </div>
+            <span className="font-mono text-xs font-black text-teal-700 mr-1">{formatNumberFa(onLeaveCount)} نفر</span>
+          </div>
+
+          <div
+            onClick={() => onNavigate('attendance')}
+            className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 flex items-center justify-between cursor-pointer transition-colors"
+          >
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Timer className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+              <span className="text-[11px] text-slate-600 truncate">اضافه‌کاری:</span>
+            </div>
+            <span className="font-mono text-xs font-black text-indigo-700 mr-1">{formatNumberFa(totalOvertimeMinutes)} دقیقه</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* 3. QUICK ACTIONS GRID (میز کار و دسترسی سریع عملیاتی)      */}
+      {/* ========================================================= */}
+      <div className="bg-white rounded-3xl p-3.5 sm:p-4 border border-slate-200/90 shadow-2xs space-y-2.5">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+            </div>
+            <div>
+              <h3 className="font-black text-xs sm:text-sm text-slate-900">
+                میز کار و دسترسی سریع عملیاتی (Quick Actions)
+              </h3>
+            </div>
+          </div>
+          <span className="text-[10px] text-slate-400 hidden sm:inline">
+            دسترسی فوری با یک کلیک
+          </span>
+        </div>
+
+        {/* 3 columns on mobile, 5 on tablet, 9 on desktop */}
+        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2 sm:gap-2.5">
+          {/* Quick Action 1: Workshop Alarms & Chimes Shortcut */}
+          <button
+            type="button"
+            onClick={() => onNavigate('alarms')}
+            className="p-2.5 sm:p-3 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-950 border border-amber-300/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer group text-center shadow-2xs"
+          >
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Bell className="w-4 h-4 text-amber-600 animate-bounce-short" />
+            </div>
+            <div className="min-w-0 w-full">
+              <span className="text-[11px] font-black block truncate">زنگ و آلارم</span>
+              <span className="text-[8px] text-amber-700 font-medium block truncate">پخش فوری کارگاه</span>
+            </div>
+          </button>
+
+          {/* Quick Action 2: Submit Personnel Request */}
+          <button
+            type="button"
+            onClick={() => setIsQuickRequestModalOpen(true)}
+            className="p-2.5 sm:p-3 rounded-2xl bg-gradient-to-br from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white flex flex-col items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer group text-center"
+          >
+            <div className="w-8 h-8 rounded-xl bg-white/20 text-white flex items-center justify-center group-hover:scale-110 transition-transform">
+              <PlusCircle className="w-4 h-4 text-white" />
+            </div>
+            <div className="min-w-0 w-full">
+              <span className="text-[11px] font-black block truncate">ثبت درخواست</span>
+              <span className="text-[8px] text-indigo-200 font-medium block truncate">مرخصی / مساعده</span>
+            </div>
+          </button>
+
+          {/* Quick Action 3: Manual Attendance */}
+          <button
+            type="button"
+            onClick={() => onNavigate('attendance')}
+            className="p-2.5 sm:p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100/90 text-emerald-950 border border-emerald-200/90 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer group text-center"
+          >
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Clock className="w-4 h-4 text-emerald-600" />
+            </div>
+            <div className="min-w-0 w-full">
+              <span className="text-[11px] font-bold block truncate">تردد دستی</span>
+              <span className="text-[8px] text-emerald-700 font-medium block truncate">اصلاح ورود/خروج</span>
+            </div>
+          </button>
+
+          {/* Quick Action 4: Settle Personal Card Expense */}
+          <button
+            type="button"
+            onClick={() => onNavigate('advances')}
+            className={`p-2.5 sm:p-3 rounded-2xl border flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer relative group text-center ${
+              pendingExpenses.length > 0
+                ? 'bg-rose-50 hover:bg-rose-100 text-rose-950 border-rose-300 ring-2 ring-rose-400/20'
+                : 'bg-slate-50 hover:bg-slate-100/90 text-slate-800 border-slate-200/90'
+            }`}
+          >
+            {pendingExpenses.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-600 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-xs animate-bounce">
+                {pendingExpenses.length}
               </span>
             )}
-          </div>
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform ${
+              pendingExpenses.length > 0 ? 'bg-rose-500/15 text-rose-700' : 'bg-blue-500/15 text-blue-700'
+            }`}>
+              <Receipt className={`w-4 h-4 ${pendingExpenses.length > 0 ? 'text-rose-600' : 'text-blue-600'}`} />
+            </div>
+            <div className="min-w-0 w-full">
+              <span className="text-[11px] font-bold block truncate">تسویه فاکتور</span>
+              <span className={`text-[8px] font-medium block truncate ${
+                pendingExpenses.length > 0 ? 'text-rose-700 font-bold' : 'text-slate-500'
+              }`}>
+                {pendingExpenses.length > 0 ? `${formatNumberFa(pendingExpenses.length)} باز` : 'خرید پرسنل'}
+              </span>
+            </div>
+          </button>
+
+          {/* Quick Action 5: Discretionary Adjustments */}
+          <button
+            type="button"
+            onClick={() => {
+              setQuickModalTab('ADJUSTMENT');
+              setIsQuickRequestModalOpen(true);
+            }}
+            className="p-2.5 sm:p-3 rounded-2xl bg-purple-50 hover:bg-purple-100/90 text-purple-950 border border-purple-200/90 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer group text-center"
+          >
+            <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Coins className="w-4 h-4 text-purple-600" />
+            </div>
+            <div className="min-w-0 w-full">
+              <span className="text-[11px] font-bold block truncate">پاداش و جریمه</span>
+              <span className="text-[8px] text-purple-700 font-medium block truncate">تعدیلات ویژه</span>
+            </div>
+          </button>
+
+          {/* Quick Action 6: Smart QR Kiosk */}
+          <button
+            type="button"
+            onClick={() => onNavigate('qr-kiosk')}
+            className="p-2.5 sm:p-3 rounded-2xl bg-slate-50 hover:bg-slate-100/90 text-slate-800 border border-slate-200/90 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer group text-center"
+          >
+            <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <QrCode className="w-4 h-4 text-purple-600" />
+            </div>
+            <div className="min-w-0 w-full">
+              <span className="text-[11px] font-bold block truncate">کیوسک QR</span>
+              <span className="text-[8px] text-slate-500 font-medium block truncate">بارکد و پوستر</span>
+            </div>
+          </button>
+
+          {/* Quick Action 7: Payroll & Advances */}
+          <button
+            type="button"
+            onClick={() => onNavigate('payroll')}
+            className="p-2.5 sm:p-3 rounded-2xl bg-slate-50 hover:bg-slate-100/90 text-slate-800 border border-slate-200/90 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer group text-center"
+          >
+            <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <DollarSign className="w-4 h-4 text-amber-600" />
+            </div>
+            <div className="min-w-0 w-full">
+              <span className="text-[11px] font-bold block truncate">فیش حقوقی</span>
+              <span className="text-[8px] text-slate-500 font-medium block truncate">محاسبه دستمزد</span>
+            </div>
+          </button>
+
+          {/* Quick Action 8: Employees Management */}
+          <button
+            type="button"
+            onClick={() => onNavigate('employees')}
+            className="p-2.5 sm:p-3 rounded-2xl bg-slate-50 hover:bg-slate-100/90 text-slate-800 border border-slate-200/90 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer group text-center"
+          >
+            <div className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Users className="w-4 h-4 text-sky-600" />
+            </div>
+            <div className="min-w-0 w-full">
+              <span className="text-[11px] font-bold block truncate">پرسنل کارگاه</span>
+              <span className="text-[8px] text-slate-500 font-medium block truncate">پرونده و شیفت</span>
+            </div>
+          </button>
+
+          {/* Quick Action 9: Settings */}
+          <button
+            type="button"
+            onClick={() => onNavigate('settings')}
+            className="p-2.5 sm:p-3 rounded-2xl bg-slate-50 hover:bg-slate-100/90 text-slate-800 border border-slate-200/90 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer group text-center"
+          >
+            <div className="w-8 h-8 rounded-xl bg-slate-500/10 text-slate-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <SettingsIcon className="w-4 h-4 text-slate-600" />
+            </div>
+            <div className="min-w-0 w-full">
+              <span className="text-[11px] font-bold block truncate">تنظیمات</span>
+              <span className="text-[8px] text-slate-500 font-medium block truncate">قوانین و پیامک</span>
+            </div>
+          </button>
         </div>
       </div>
 
       {/* ========================================================= */}
-      {/* 2. PROMINENT SYSTEM-LEVEL STATUS & TELEMETRY INDICATORS   */}
+      {/* 4. OTHER CONTENTS SECTION (تب‌بندی شده برای موبایل)       */}
       {/* ========================================================= */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {/* Status 1: Pending Approvals */}
-        <div className={`p-4 rounded-2xl border transition-all ${
-          totalUrgentCount > 0
-            ? 'bg-rose-50/80 border-rose-200 text-rose-950'
-            : 'bg-emerald-50/80 border-emerald-200 text-emerald-950'
-        }`}>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-600">درخواست‌های معوق مدیر</span>
-            <Shield className={`w-4 h-4 ${totalUrgentCount > 0 ? 'text-rose-600' : 'text-emerald-600'}`} />
+      <div className="space-y-4">
+        {/* Navigation Tabs for Other Contents */}
+        <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl overflow-x-auto max-w-full">
+            <button
+              type="button"
+              onClick={() => setDashboardTab('REQUESTS')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                dashboardTab === 'REQUESTS'
+                  ? 'bg-white text-indigo-950 shadow-xs font-black'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <AlertTriangle className={`w-3.5 h-3.5 ${dashboardTab === 'REQUESTS' ? 'text-rose-600' : 'text-slate-400'}`} />
+              <span>هشدارها و مطالبات</span>
+              {totalUrgentCount > 0 && (
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-rose-500 text-white font-mono font-bold animate-pulse">
+                  {formatNumberFa(totalUrgentCount)}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setDashboardTab('PRESENCE')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                dashboardTab === 'PRESENCE'
+                  ? 'bg-white text-indigo-950 shadow-xs font-black'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Activity className={`w-3.5 h-3.5 ${dashboardTab === 'PRESENCE' ? 'text-blue-600' : 'text-slate-400'}`} />
+              <span>پایش تردد و پرسنل</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-800 font-mono font-bold">
+                {formatNumberFa(presentCount)}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setDashboardTab('TRENDS')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                dashboardTab === 'TRENDS'
+                  ? 'bg-white text-indigo-950 shadow-xs font-black'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <BarChart3 className={`w-3.5 h-3.5 ${dashboardTab === 'TRENDS' ? 'text-indigo-600' : 'text-slate-400'}`} />
+              <span>نمودار روند هفتگی</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setDashboardTab('LOGS')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                dashboardTab === 'LOGS'
+                  ? 'bg-white text-indigo-950 shadow-xs font-black'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <History className={`w-3.5 h-3.5 ${dashboardTab === 'LOGS' ? 'text-indigo-600' : 'text-slate-400'}`} />
+              <span>رویدادهای زنده سیستم</span>
+            </button>
           </div>
-          <div className="text-2xl font-black tracking-tight mt-1.5">
-            {formatNumberFa(totalUrgentCount)}
-            <span className="text-xs font-normal text-slate-500 mr-1.5">مورد در انتظار</span>
-          </div>
-          <div className="text-[11px] text-slate-500 mt-0.5 truncate font-medium">
-            {totalUrgentCount > 0 ? 'نیاز به تایید فوری مدیریت' : '✓ تمام موارد تعیین تکلیف شدند'}
-          </div>
+          <span className="text-[11px] text-slate-400 px-2 hidden md:inline">
+            بررسی سریع مطالب بدون نیاز به اسکرول
+          </span>
         </div>
 
-        {/* Status 2: Open Financial Obligations */}
-        <div className="bg-amber-50/80 border border-amber-200 p-4 rounded-2xl text-amber-950">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-600">مطالبات مالی در انتظار</span>
-            <Receipt className="w-4 h-4 text-amber-600" />
-          </div>
-          <div className="text-xl sm:text-2xl font-black tracking-tight mt-1.5 truncate">
-            {formatCurrencyTomans(totalPendingFinancialAmount)}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-0.5 truncate font-medium">
-            {formatNumberFa(pendingExpenses.length)} فاکتور + {formatNumberFa(pendingAdvances.length)} مساعده باز
-          </div>
-        </div>
-
-        {/* Status 3: Live Workshop Presence */}
-        <div className="bg-blue-50/80 border border-blue-200 p-4 rounded-2xl text-blue-950">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-600">حضور و غیاب امروز</span>
-            <Activity className="w-4 h-4 text-blue-600" />
-          </div>
-          <div className="text-2xl font-black tracking-tight mt-1.5">
-            {formatNumberFa(presentCount)}
-            <span className="text-xs font-normal text-slate-500 mr-1.5">از {formatNumberFa(totalEmployees)} نفر حاضر</span>
-          </div>
-          <div className="text-[11px] text-slate-500 mt-0.5 truncate font-medium">
-            {formatNumberFa(absentCount)} غایب • {formatNumberFa(lateCount)} تاخیر
-          </div>
-        </div>
-
-        {/* Status 4: Messaging & Gateway Status */}
-        <div className="bg-indigo-50/80 border border-indigo-200 p-4 rounded-2xl text-indigo-950">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-600">سامانه پیامک و اعتبار</span>
-            <MessageSquare className="w-4 h-4 text-indigo-600" />
-          </div>
-          <div className="text-sm sm:text-base font-black tracking-tight mt-2 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-            <span className="truncate">
-              {settings.smsProvider === 'MELIPAYAMAK' ? 'ملی‌پیامک (فعال)' :
-               settings.smsProvider === 'IPPANEL_FARAZ' ? 'فراز اس‌ام‌اس (فعال)' :
-               settings.smsProvider === 'GHASEDAK' ? 'قاصدک (فعال)' :
-               settings.smsProvider === 'SMS_IR' ? 'SMS.ir (فعال)' :
-               settings.smsProvider === 'CUSTOM' ? 'وب‌سرویس سفارشی' : 'کاوه‌نگار (فعال)'}
-            </span>
-          </div>
-          <div className="text-[11px] text-indigo-900 font-bold mt-1 truncate">
-            {settings.smsLastBalance ? `مانده: ${settings.smsLastBalance}` : 'آماده ارسال اعلان تردد و فیش'}
-          </div>
-        </div>
-      </div>
-
-      {/* ========================================================= */}
-      {/* 3. HIGH-PRIORITY 'ALERTS & REQUESTS' PANEL                */}
-      {/* ========================================================= */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
+        {/* Tab 1: High Priority Alerts & Requests Panel */}
+        {dashboardTab === 'REQUESTS' && (
+        <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
         {/* Panel Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
           <div className="flex items-center gap-3">
@@ -1086,185 +1421,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           )}
         </div>
       </div>
+      )}
 
-      {/* ========================================================= */}
-      {/* 4. 'QUICK ACTIONS' GRID                                  */}
-      {/* ========================================================= */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-              <Sparkles className="w-4 h-4 text-indigo-600" />
-            </div>
-            <div>
-              <h3 className="font-black text-sm sm:text-base text-slate-900">
-                میز کار و دسترسی سریع عملیاتی (Quick Actions)
-              </h3>
-              <p className="text-[11px] text-slate-500">
-                عملیات پرتکرار مدیریتی با یک کلیک
-              </p>
-            </div>
-          </div>
-          <span className="text-[11px] text-slate-400 hidden sm:inline">
-            ۹ میانبر کاربردی فعال
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-3">
-          {/* Quick Action 0: Workshop Alarms & Chimes Shortcut */}
-          <button
-            type="button"
-            onClick={() => onNavigate('alarms')}
-            className="p-3.5 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-200/90 flex flex-col items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer group text-center shadow-2xs"
-          >
-            <Bell className="w-5 h-5 text-amber-600 group-hover:scale-110 group-hover:rotate-12 transition-transform" />
-            <div className="min-w-0">
-              <span className="text-xs font-bold block truncate">زنگ و آلارم</span>
-              <span className="text-[9px] text-amber-700 font-medium block truncate">پخش فوری و شیفت</span>
-            </div>
-          </button>
-
-          {/* Quick Action 1: Submit Personnel Request */}
-          <button
-            type="button"
-            onClick={() => setIsQuickRequestModalOpen(true)}
-            className="p-3.5 rounded-2xl bg-gradient-to-br from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white flex flex-col items-center justify-center gap-2 shadow-sm active:scale-95 transition-all cursor-pointer group text-center"
-          >
-            <PlusCircle className="w-5 h-5 text-indigo-200 group-hover:scale-110 transition-transform" />
-            <div className="min-w-0">
-              <span className="text-xs font-black block truncate">ثبت درخواست‌ها</span>
-              <span className="text-[9px] text-indigo-200 font-medium block truncate">مرخصی / مساعده</span>
-            </div>
-          </button>
-
-          {/* Quick Action 2: Smart QR Kiosk */}
-          <button
-            type="button"
-            onClick={() => onNavigate('qr-kiosk')}
-            className="p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100/90 text-slate-800 border border-slate-200/90 flex flex-col items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer group text-center"
-          >
-            <QrCode className="w-5 h-5 text-purple-600 group-hover:scale-110 transition-transform" />
-            <div className="min-w-0">
-              <span className="text-xs font-bold block truncate">کیوسک هوشمند QR</span>
-              <span className="text-[9px] text-slate-500 font-medium block truncate">حضور و غیاب کارگاه</span>
-            </div>
-          </button>
-
-          {/* Quick Action 3: Manual Attendance */}
-          <button
-            type="button"
-            onClick={() => onNavigate('attendance')}
-            className="p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100/90 text-slate-800 border border-slate-200/90 flex flex-col items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer group text-center"
-          >
-            <Clock className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition-transform" />
-            <div className="min-w-0">
-              <span className="text-xs font-bold block truncate">ثبت تردد دستی</span>
-              <span className="text-[9px] text-slate-500 font-medium block truncate">اصلاح ورود و خروج</span>
-            </div>
-          </button>
-
-          {/* Quick Action 4: Settle Personal Card Expense */}
-          <button
-            type="button"
-            onClick={() => onNavigate('advances')}
-            className={`p-3.5 rounded-2xl border flex flex-col items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer relative group text-center ${
-              pendingExpenses.length > 0
-                ? 'bg-rose-50 hover:bg-rose-100 text-rose-950 border-rose-300 ring-2 ring-rose-400/20'
-                : 'bg-slate-50 hover:bg-slate-100/90 text-slate-800 border-slate-200/90'
-            }`}
-          >
-            {pendingExpenses.length > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-600 text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs animate-bounce">
-                {pendingExpenses.length}
-              </span>
-            )}
-            <Receipt className={`w-5 h-5 group-hover:scale-110 transition-transform ${
-              pendingExpenses.length > 0 ? 'text-rose-600' : 'text-blue-600'
-            }`} />
-            <div className="min-w-0">
-              <span className="text-xs font-bold block truncate">تسویه فاکتورها</span>
-              <span className={`text-[9px] font-medium block truncate ${
-                pendingExpenses.length > 0 ? 'text-rose-700 font-bold' : 'text-slate-500'
-              }`}>
-                {pendingExpenses.length > 0 ? `${formatNumberFa(pendingExpenses.length)} فاکتور باز` : 'خرید شخصی کارگر'}
-              </span>
-            </div>
-          </button>
-
-          {/* Quick Action 5: Payroll & Advances */}
-          <button
-            type="button"
-            onClick={() => onNavigate('payroll')}
-            className="p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100/90 text-slate-800 border border-slate-200/90 flex flex-col items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer group text-center"
-          >
-            <DollarSign className="w-5 h-5 text-amber-600 group-hover:scale-110 transition-transform" />
-            <div className="min-w-0">
-              <span className="text-xs font-bold block truncate">محاسبه و فیش حقوق</span>
-              <span className="text-[9px] text-slate-500 font-medium block truncate">دستمزد و بیمه</span>
-            </div>
-          </button>
-
-          {/* Quick Action 5.5: Discretionary Adjustments */}
-          <button
-            type="button"
-            onClick={() => {
-              setQuickModalTab('ADJUSTMENT');
-              setIsQuickRequestModalOpen(true);
-            }}
-            className="p-3.5 rounded-2xl bg-indigo-50/70 hover:bg-indigo-100/90 text-indigo-950 border border-indigo-200/90 flex flex-col items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer group text-center"
-          >
-            <Coins className="w-5 h-5 text-indigo-600 group-hover:scale-110 transition-transform" />
-            <div className="min-w-0">
-              <span className="text-xs font-bold block truncate">پاداش / جریمه / مساعده</span>
-              <span className="text-[9px] text-indigo-700 font-medium block truncate">تعدیلات خارج چارچوب</span>
-            </div>
-          </button>
-
-          {/* Quick Action 6: Excel Reports */}
-          <button
-            type="button"
-            onClick={() => onNavigate('reports')}
-            className="p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100/90 text-slate-800 border border-slate-200/90 flex flex-col items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer group text-center"
-          >
-            <FileSpreadsheet className="w-5 h-5 text-teal-600 group-hover:scale-110 transition-transform" />
-            <div className="min-w-0">
-              <span className="text-xs font-bold block truncate">گزارشات و اکسل</span>
-              <span className="text-[9px] text-slate-500 font-medium block truncate">خروجی آماری استاندارد</span>
-            </div>
-          </button>
-
-          {/* Quick Action 7: Employees Management */}
-          <button
-            type="button"
-            onClick={() => onNavigate('employees')}
-            className="p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100/90 text-slate-800 border border-slate-200/90 flex flex-col items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer group text-center"
-          >
-            <Users className="w-5 h-5 text-sky-600 group-hover:scale-110 transition-transform" />
-            <div className="min-w-0">
-              <span className="text-xs font-bold block truncate">مدیریت پرسنل</span>
-              <span className="text-[9px] text-slate-500 font-medium block truncate">پرونده، شیفت و رمز</span>
-            </div>
-          </button>
-
-          {/* Quick Action 8: Settings */}
-          <button
-            type="button"
-            onClick={() => onNavigate('settings')}
-            className="p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100/90 text-slate-800 border border-slate-200/90 flex flex-col items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer group text-center"
-          >
-            <SettingsIcon className="w-5 h-5 text-slate-600 group-hover:scale-110 transition-transform" />
-            <div className="min-w-0">
-              <span className="text-xs font-bold block truncate">تنظیمات کارگاه</span>
-              <span className="text-[9px] text-slate-500 font-medium block truncate">مختصات GPS و پیامک</span>
-            </div>
-          </button>
-        </div>
-      </div>
-
-      {/* ========================================================= */}
-      {/* 5. 6 STATISTICAL KPI CARDS (2 Columns Mobile / 6 Columns) */}
-      {/* ========================================================= */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      {/* Tab 2: Today's Attendance & Personnel Presence */}
+      {dashboardTab === 'PRESENCE' && (
+      <div className="space-y-4">
+        {/* 6 Statistical KPI Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {/* Card 1: Total Active Personnel */}
         <div
           onClick={() => onNavigate('employees')}
@@ -1397,61 +1560,107 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <Timer className="w-5 h-5" />
           </div>
         </div>
-      </div>
+        </div>
 
-      {/* ========================================================= */}
-      {/* 6. WEEKLY ATTENDANCE TREND CHART & RECENT ACTIVITY FEED  */}
-      {/* ========================================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Weekly Trend Chart (2 columns on Desktop) */}
-        <div className="lg:col-span-2 bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">
-                  نمودار روند حضور و غیاب هفته جاری (شنبه تا جمعه)
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  پایش دقیق تعداد حاضرین، تاخیرها و غیبت‌های ثبت‌شده
-                </p>
-              </div>
-
-              <button
-                onClick={() => onNavigate('attendance')}
-                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-indigo-50 hover:bg-indigo-100/70 px-3 py-1.5 rounded-xl transition-colors"
-              >
-                <span>مشاهده دفتر حضور و غیاب</span>
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="h-60 sm:h-68 w-full" dir="ltr">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={weeklyAttendanceData} barGap={4}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                  <XAxis dataKey="day" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#0f172a',
-                      borderRadius: '12px',
-                      color: '#fff',
-                      fontSize: '11px',
-                      direction: 'rtl',
-                      border: 'none',
-                    }}
-                  />
-                  <Bar dataKey="حاضر" fill="#10b981" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="تاخیر" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="غایب" fill="#f43f5e" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+        {/* Today's Active Presence Roster */}
+        <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <h4 className="font-bold text-xs sm:text-sm text-slate-900 flex items-center gap-2">
+              <UserCheck className="w-4 h-4 text-emerald-600" />
+              <span>پرسنل ثبت‌شده در شیفت کاری امروز ({formatNumberFa(todayAttendance.length)} نفر)</span>
+            </h4>
+            <button
+              type="button"
+              onClick={() => onNavigate('attendance')}
+              className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-indigo-50 px-2.5 py-1 rounded-lg"
+            >
+              <span>مشاهده دفتر تردد</span>
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
           </div>
 
-          {/* Chart Legend */}
-          <div className="flex items-center justify-center gap-6 text-xs text-slate-600 mt-3 pt-3 border-t border-slate-100 flex-wrap">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            {todayAttendance.map((rec) => {
+              const emp = employees.find((e) => e.id === rec.employeeId);
+              return (
+                <div key={rec.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
+                  <div className="min-w-0">
+                    <span className="font-black text-slate-900 block truncate">
+                      {emp ? `${emp.firstName} ${emp.lastName}` : rec.employeeId}
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      ورود: <strong className="text-emerald-700">{rec.checkInTime || '-'}</strong>
+                      {rec.checkOutTime ? ` | خروج: ${rec.checkOutTime}` : ' | در کارگاه'}
+                    </span>
+                  </div>
+                  {rec.lateMinutes && rec.lateMinutes > 0 ? (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-mono font-bold shrink-0">
+                      {formatNumberFa(rec.lateMinutes)}د تاخیر
+                    </span>
+                  ) : (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold shrink-0">
+                      حاضر
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+            {todayAttendance.length === 0 && (
+              <div className="col-span-full text-center py-6 text-xs text-slate-400">
+                هنوز ترددی برای امروز ثبت نشده است.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      )}
+
+      {/* Tab 3: Weekly Attendance Trend Chart */}
+      {dashboardTab === 'TRENDS' && (
+        <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">
+                نمودار روند حضور و غیاب هفته جاری (شنبه تا جمعه)
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                پایش دقیق تعداد حاضرین، تاخیرها و غیبت‌های ثبت‌شده در طول هفته
+              </p>
+            </div>
+
+            <button
+              onClick={() => onNavigate('attendance')}
+              className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-indigo-50 hover:bg-indigo-100/70 px-3 py-1.5 rounded-xl transition-colors"
+            >
+              <span>مشاهده دفتر حضور و غیاب</span>
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="h-64 sm:h-72 w-full" dir="ltr">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={weeklyAttendanceData} barGap={4}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <XAxis dataKey="day" stroke="#94a3b8" fontSize={11} tickLine={false} />
+                <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#0f172a',
+                    borderRadius: '12px',
+                    color: '#fff',
+                    fontSize: '11px',
+                    direction: 'rtl',
+                    border: 'none',
+                  }}
+                />
+                <Bar dataKey="حاضر" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="تاخیر" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="غایب" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="flex items-center justify-center gap-6 text-xs text-slate-600 pt-3 border-t border-slate-100 flex-wrap">
             <div className="flex items-center gap-1.5 font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
               <span>حاضر در کارگاه</span>
@@ -1466,47 +1675,47 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
         </div>
+      )}
 
-        {/* Live System Activity Feed / Audit Log (1 column on Desktop) */}
-        <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-4">
-          <div>
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <History className="w-4 h-4 text-indigo-600 shrink-0" />
-                <h3 className="font-extrabold text-sm sm:text-base text-slate-900">
-                  آخرین رویدادهای کارگاه
-                </h3>
+      {/* Tab 4: Live Activity Feed */}
+      {dashboardTab === 'LOGS' && (
+        <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <History className="w-4 h-4 text-indigo-600 shrink-0" />
+              <h3 className="font-extrabold text-sm sm:text-base text-slate-900">
+                آخرین رویدادهای کارگاه و تغییرات سیستم
+              </h3>
+            </div>
+            <span className="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 font-bold">
+              زنده
+            </span>
+          </div>
+
+          <div className="space-y-2.5">
+            {auditLogs.slice(0, 8).map((log) => (
+              <div
+                key={log.id}
+                className="p-3 rounded-2xl bg-slate-50 border border-slate-200/70 text-right space-y-1 hover:bg-slate-100/70 transition-colors"
+              >
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-900">{log.action}</span>
+                  <span className="text-[10px] font-mono text-slate-400">{log.timestamp?.split(' ')[1] || log.timestamp}</span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed truncate">
+                  {log.details}
+                </p>
+                <div className="text-[10px] text-slate-400">
+                  توسط: <span className="font-medium text-slate-600">{log.userName}</span>
+                </div>
               </div>
-              <span className="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 font-bold">
-                زنده
-              </span>
-            </div>
+            ))}
 
-            <div className="space-y-3 mt-3">
-              {auditLogs.slice(0, 5).map((log) => (
-                <div
-                  key={log.id}
-                  className="p-3 rounded-2xl bg-slate-50 border border-slate-200/70 text-right space-y-1 hover:bg-slate-100/70 transition-colors"
-                >
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-900">{log.action}</span>
-                    <span className="text-[10px] font-mono text-slate-400">{log.timestamp?.split(' ')[1] || log.timestamp}</span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 leading-relaxed truncate">
-                    {log.details}
-                  </p>
-                  <div className="text-[10px] text-slate-400">
-                    توسط: <span className="font-medium text-slate-600">{log.userName}</span>
-                  </div>
-                </div>
-              ))}
-
-              {auditLogs.length === 0 && (
-                <div className="text-center py-8 text-xs text-slate-400">
-                  هنوز رویدادی ثبت نشده است.
-                </div>
-              )}
-            </div>
+            {auditLogs.length === 0 && (
+              <div className="text-center py-8 text-xs text-slate-400">
+                هنوز رویدادی ثبت نشده است.
+              </div>
+            )}
           </div>
 
           <button
@@ -1514,10 +1723,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             onClick={() => onNavigate('settings')}
             className="w-full py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200/70 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
           >
-            <span>مشاهده لاگ‌های امنیتی در تنظیمات</span>
+            <span>مشاهده لاگ‌های امنیتی کامل در تنظیمات</span>
             <ExternalLink className="w-3.5 h-3.5" />
           </button>
         </div>
+      )}
       </div>
 
       {/* ========================================================= */}

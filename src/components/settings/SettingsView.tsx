@@ -47,6 +47,16 @@ interface SettingsViewProps {
   currentUser?: User;
 }
 
+export type SettingsTabId =
+  | 'BRAND'
+  | 'ATTENDANCE'
+  | 'LEAVES_ADVANCES'
+  | 'PAYROLL'
+  | 'GEOFENCE'
+  | 'SMS'
+  | 'BACKUP'
+  | 'AUDIT';
+
 export const SettingsView: React.FC<SettingsViewProps> = ({
   settings,
   auditLogs,
@@ -54,7 +64,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   canEdit,
   currentUser,
 }) => {
-  const [activeTab, setActiveTab] = useState<'SETTINGS' | 'AUDIT'>('SETTINGS');
+  const [activeTab, setActiveTab] = useState<SettingsTabId>('BRAND');
   const [auditSearch, setAuditSearch] = useState('');
   const [auditFilter, setAuditFilter] = useState('ALL');
 
@@ -317,46 +327,82 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   return (
     <div className="space-y-6 w-full max-w-full">
-      {/* Top Banner */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <Settings className="w-5 h-5 text-indigo-600" />
-            <span>تنظیمات سامانه و رصد وقایع امنیتی</span>
-          </h2>
-          <p className="text-xs text-slate-500 mt-1">
-            پیکربندی قوانین تردد، ژئوفنسینگ کارگاه‌ها، سقف‌های مرخصی و لاگ تغییرات
-          </p>
+      {/* Top Header & Settings Tab Navigation */}
+      <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
+              <Settings className="w-5 h-5 text-indigo-600" />
+              <span>تنظیمات یکپارچه، قوانین کارگاه و امنیت</span>
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              پیکربندی هویت، قوانین تردد، مرخصی و مساعده، فیش حقوقی، پنل پیامک، ژئوفنسینگ و لاگ‌ها
+            </p>
+          </div>
+
+          {canEdit && activeTab !== 'AUDIT' && (
+            <button
+              type="button"
+              onClick={handleSubmit as any}
+              disabled={isSaving}
+              className="py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all disabled:opacity-50 self-start md:self-auto shrink-0"
+            >
+              {isSaving ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" />
+                  <span>در حال ذخیره...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 text-emerald-400" />
+                  <span>ذخیره تغییرات</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
 
-        {/* Tab Switch */}
-        <div className="flex items-center bg-slate-100 p-1 rounded-xl">
-          <button
-            type="button"
-            onClick={() => setActiveTab('SETTINGS')}
-            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-              activeTab === 'SETTINGS'
-                ? 'bg-white text-slate-900 shadow-xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            تنظیمات و قوانین شرکت
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('AUDIT')}
-            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-              activeTab === 'AUDIT'
-                ? 'bg-white text-slate-900 shadow-xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            لاگ تغییرات ({auditLogs.length})
-          </button>
+        {/* Tab Navigation - Horizontally scrollable on mobile */}
+        <div className="flex items-center gap-1.5 p-1.5 bg-slate-100 rounded-2xl overflow-x-auto scrollbar-none max-w-full">
+          {[
+            { id: 'BRAND' as SettingsTabId, label: 'هویت برند و شرکت', icon: Building2 },
+            { id: 'ATTENDANCE' as SettingsTabId, label: 'تردد و شیفت‌ها', icon: Clock },
+            { id: 'LEAVES_ADVANCES' as SettingsTabId, label: 'مرخصی و مساعده', icon: PlaneTakeoff },
+            { id: 'PAYROLL' as SettingsTabId, label: 'محاسبه حقوق و دستمزد', icon: Calculator },
+            { id: 'GEOFENCE' as SettingsTabId, label: 'موقعیت مکانی و شعب', icon: MapPin },
+            { id: 'SMS' as SettingsTabId, label: 'سامانه پیامک و اعتبار', icon: MessageSquare },
+            { id: 'BACKUP' as SettingsTabId, label: 'پشتیبان‌گیری پایگاه‌داده', icon: Database },
+            { id: 'AUDIT' as SettingsTabId, label: 'لاگ تغییرات امنیتی', icon: History, count: auditLogs.length },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                  isActive
+                    ? 'bg-white text-indigo-950 shadow-xs ring-1 ring-slate-200/60 font-black'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                }`}
+              >
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
+                <span>{tab.label}</span>
+                {tab.count !== undefined && (
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    isActive ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200 text-slate-600'
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {activeTab === 'SETTINGS' ? (
+      {activeTab !== 'AUDIT' ? (
         <form onSubmit={handleSubmit} className="space-y-6">
           {savedSuccess && (
             <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2 animate-in fade-in duration-150">
@@ -366,6 +412,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           )}
 
           {/* Section 1: Brand & Logo */}
+          {activeTab === 'BRAND' && (
           <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-5">
             <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2 pb-3 border-b border-slate-100">
               <Building2 className="w-4 h-4 text-indigo-600" />
@@ -489,8 +536,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
             </div>
           </div>
+          )}
 
           {/* Section 2: Work Schedule & Timing Patterns */}
+          {activeTab === 'ATTENDANCE' && (
           <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
             <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2 pb-3 border-b border-slate-100">
               <Clock className="w-4 h-4 text-indigo-600" />
@@ -545,8 +594,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
             </div>
           </div>
+          )}
 
-          {/* Section 3: Leave Rules */}
+          {/* Section 3 & 4: Leave & Advance Rules */}
+          {activeTab === 'LEAVES_ADVANCES' && (
+          <>
           <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
             <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2 pb-3 border-b border-slate-100">
               <PlaneTakeoff className="w-4 h-4 text-indigo-600" />
@@ -675,8 +727,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
             </div>
           </div>
+          </>
+          )}
 
           {/* Section 5: Payroll & Calculations */}
+          {activeTab === 'PAYROLL' && (
           <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
             <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2 pb-3 border-b border-slate-100">
               <Calculator className="w-4 h-4 text-indigo-600" />
@@ -786,8 +841,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
             </div>
           </div>
+          )}
 
           {/* Section 6: Workshops & Geofencing (20m radius) */}
+          {activeTab === 'GEOFENCE' && (
           <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
@@ -846,8 +903,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               ))}
             </div>
           </div>
+          )}
 
           {/* Section 7: Real SMS Gateway & Live Testing (Melipayamak Upgrade & UI Overhaul) */}
+          {activeTab === 'SMS' && (
           <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-6">
             {/* Header & Main Toggle */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-3">
@@ -1510,7 +1569,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               )}
             </div>
           </div>
+          )}
 
+          {/* Section 8: Database Backup & Developer Information */}
+          {activeTab === 'BACKUP' && (
+          <>
           {/* Database Backup & Export Card */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
             <div className="flex items-center justify-between">
@@ -1571,31 +1634,35 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
           {/* System & Developer Info Card */}
           <DeveloperBadge variant="card" />
+          </>
+          )}
 
           {canEdit && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-slate-200">
-              <div className="text-xs text-slate-500">
-                {savedSuccess && (
-                  <span className="inline-flex items-center gap-1.5 text-emerald-700 font-bold bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+            <div className="sticky bottom-3 z-30 bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-slate-200 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="text-xs text-slate-600 font-medium">
+                {savedSuccess ? (
+                  <span className="inline-flex items-center gap-1.5 text-emerald-700 font-bold bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200">
                     <CheckCircle className="w-4 h-4 text-emerald-600" />
-                    <span>تنظیمات و اطلاعات پنل پیامک با موفقیت در سرور پایدار و ثبت شد.</span>
+                    <span>تنظیمات این بخش با موفقیت در سرور ذخیره شد.</span>
                   </span>
+                ) : (
+                  <span>تغییرات شما پس از کلیک روی ذخیره در سامانه اعمال می‌شود.</span>
                 )}
               </div>
               <button
                 type="submit"
                 disabled={isSaving}
-                className="py-3 px-6 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-2 shadow-md cursor-pointer transition-colors disabled:opacity-50"
+                className="w-full sm:w-auto py-2.5 px-6 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all active:scale-95 disabled:opacity-50"
               >
                 {isSaving ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>در حال ذخیره‌سازی در سرور...</span>
+                    <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" />
+                    <span>در حال ذخیره‌سازی...</span>
                   </>
                 ) : (
                   <>
-                    <Save className="w-4 h-4" />
-                    <span>ذخیره کلیه تنظیمات و پنل پیامک</span>
+                    <Save className="w-4 h-4 text-emerald-400" />
+                    <span>ذخیره تغییرات</span>
                   </>
                 )}
               </button>
