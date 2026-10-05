@@ -45,6 +45,7 @@ import {
   TrendingDown,
   Bell,
   BarChart3,
+  Home,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -67,6 +68,7 @@ import {
   AuditLog,
   ManagerAdjustmentType,
   CompanySettings,
+  HomeworkTask,
 } from '../../types';
 import {
   formatNumberFa,
@@ -227,16 +229,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const pendingAdvances = advances.filter((a) => a.status === 'PENDING');
   const totalPendingAdvanceAmount = pendingAdvances.reduce((sum, a) => sum + a.amount, 0);
 
-  // Total Open Financial Obligations
-  const totalPendingFinancialAmount = totalPendingExpenseAmount + totalPendingAdvanceAmount;
+  // 3. Pending Financial: Homework & Piecework wages (کار در منزل و کارمزدی)
+  const allHomeworkTasks: HomeworkTask[] = StorageService.getAllHomeworkTasksRaw();
+  const pendingHomeworkTasks = allHomeworkTasks.filter((t) => t.status === 'PENDING');
+  const totalPendingHomeworkWage = pendingHomeworkTasks.reduce((sum, t) => sum + t.totalWage, 0);
 
-  // 3. Pending Leaves
+  // Total Open Financial Obligations
+  const totalPendingFinancialAmount = totalPendingExpenseAmount + totalPendingAdvanceAmount + totalPendingHomeworkWage;
+
+  // 4. Pending Leaves
   const pendingLeaves = leaves.filter((l) => l.status === 'PENDING');
 
-  // 4. Pending Manual Attendance Punch Requests
+  // 5. Pending Manual Attendance Punch Requests
   const pendingManualAttendance = attendance.filter((a) => a.approvalStatus === 'PENDING');
 
-  // 5. Open Shifts (Clocked-in without checkout past standard shift hours)
+  // 6. Open Shifts (Clocked-in without checkout past standard shift hours)
   const notCheckedOutEmployees = todayAttendance.filter(
     (a) => a.checkInTime && !a.checkOutTime
   );
@@ -245,6 +252,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const totalUrgentCount =
     pendingExpenses.length +
     pendingAdvances.length +
+    pendingHomeworkTasks.length +
     pendingLeaves.length +
     pendingManualAttendance.length;
 
@@ -308,6 +316,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       'عدم موافقت مدیریت با پرداخت مساعده در این دوره'
     );
     showFeedback('درخواست مساعده رد شد.', false);
+    onRefresh?.();
+  };
+
+  const handleSettleHomeworkNow = (taskId: string) => {
+    StorageService.reviewHomeworkTask(taskId, 'SETTLE_NOW', currentUser?.name || 'مدیریت کارگاه', 'تسویه نقدی فوری از داشبورد');
+    showFeedback('✓ دستمزد کار در منزل به صورت نقدی تسویه شد.');
+    onRefresh?.();
+  };
+
+  const handleAddHomeworkToSalary = (taskId: string) => {
+    StorageService.reviewHomeworkTask(taskId, 'ADD_TO_SALARY', currentUser?.name || 'مدیریت کارگاه', 'افزودن دستمزد به حقوق ماه جاری از داشبورد');
+    showFeedback('✓ دستمزد کار در منزل به فیش حقوق ماه جاری اضافه گردید.');
+    onRefresh?.();
+  };
+
+  const handleRejectHomework = (taskId: string) => {
+    const reason = prompt('لطفاً دلیل رد کار در منزل را وارد فرمایید:') || 'عدم انطباق کیفی با سفارش';
+    StorageService.reviewHomeworkTask(taskId, 'REJECT', currentUser?.name || 'مدیریت کارگاه', reason);
+    showFeedback('کار در منزل رد شد.', false);
     onRefresh?.();
   };
 
@@ -671,7 +698,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {formatCurrencyTomans(totalPendingFinancialAmount)}
               </div>
               <div className="text-[10px] text-slate-500 mt-1 truncate">
-                {formatNumberFa(pendingExpenses.length)} فاکتور خرید + {formatNumberFa(pendingAdvances.length)} مساعده باز
+                {formatNumberFa(pendingExpenses.length)} فاکتور خرید + {formatNumberFa(pendingAdvances.length)} مساعده + {formatNumberFa(pendingHomeworkTasks.length)} کار در منزل
               </div>
               <span className="text-[9px] text-amber-700 font-bold mt-1 block">تسویه و پرداخت ←</span>
             </div>
@@ -1228,6 +1255,84 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* SECTION B2: Homework Tasks (Pending Piecework & Homework Wages) */}
+          {(activeAlertTab === 'ALL' || activeAlertTab === 'FINANCIAL') && pendingHomeworkTasks.length > 0 && (
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between text-xs font-bold text-indigo-950 px-1 pt-1">
+                <span className="flex items-center gap-1.5">
+                  <Home className="w-4 h-4 text-indigo-600" />
+                  <span>گزارش‌های کار در منزل و کارمزدی در انتظار تسویه ({formatNumberFa(pendingHomeworkTasks.length)} مورد)</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('advances')}
+                  className="text-indigo-600 hover:text-indigo-800 text-[11px] font-medium flex items-center gap-0.5 cursor-pointer"
+                >
+                  <span>مدیریت کامل کار در منزل</span>
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {pendingHomeworkTasks.map((task) => (
+                <div
+                  key={task.id}
+                  className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-200/80 hover:bg-indigo-50 transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 text-right"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs mt-0.5">
+                      <Home className="w-5 h-5" />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-black text-slate-900">{task.employeeName}</span>
+                        <span className="text-[11px] text-slate-500 font-mono">({task.date})</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-bold border border-indigo-200">
+                          کار در منزل / کارمزدی
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-700 font-medium">
+                        نوع کار: <strong className="text-slate-900">{task.taskType}</strong> • مقدار: <strong className="text-indigo-900">{formatNumberFa(task.quantity)} {task.unit}</strong> (نرخ واحد: {formatCurrencyTomans(task.wagePerUnit)})
+                      </p>
+                      <div className="text-sm font-black text-indigo-800 font-mono">
+                        مبلغ دستمزد: {formatCurrencyTomans(task.totalWage)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 self-end md:self-center shrink-0 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => handleSettleHomeworkNow(task.id)}
+                      className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                      title="تسویه حساب نقدی فوری"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>تسویه نقدی فوری</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddHomeworkToSalary(task.id)}
+                      className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                      title="افزودن دستمزد به فیش حقوقی ماه جاری"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" />
+                      <span>افزودن به فیش حقوق</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRejectHomework(task.id)}
+                      className="px-3 py-2 rounded-xl bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 active:scale-95 text-xs font-bold transition-all cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>رد</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 

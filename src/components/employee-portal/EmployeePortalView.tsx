@@ -33,7 +33,12 @@ import {
   ChevronRight,
   Sparkles,
   Calendar as CalendarIcon,
-  HelpCircle
+  HelpCircle,
+  Home,
+  Plus,
+  PackageCheck,
+  CheckCircle2,
+  Edit2
 } from 'lucide-react';
 import {
   Employee,
@@ -44,7 +49,9 @@ import {
   User,
   WorkerExpense,
   ExpenseStatus,
-  WorkshopAlarm
+  WorkshopAlarm,
+  HomeworkTask,
+  HomeworkTaskStatus
 } from '../../types';
 import { CopyButton } from '../common/CopyButton';
 import { StorageService } from '../../services/storage';
@@ -109,6 +116,12 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
   const [manualTime, setManualTime] = useState(getCurrentTimeStr());
   const [manualReason, setManualReason] = useState('');
 
+  // Edit today attendance modal (for manual attendance personnel)
+  const [isEditTodayAttendanceModalOpen, setIsEditTodayAttendanceModalOpen] = useState(false);
+  const [editCheckInTime, setEditCheckInTime] = useState('');
+  const [editCheckOutTime, setEditCheckOutTime] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+
   // Biometric Sensor Modal & State
   const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
   const [bioModalMode, setBioModalMode] = useState<'PUNCH' | 'REGISTER'>('PUNCH');
@@ -131,6 +144,20 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
   const [isSubmittingExpense, setIsSubmittingExpense] = useState(false);
   const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
   const [isExpenseHistoryModalOpen, setIsExpenseHistoryModalOpen] = useState(false);
+
+  // Homework / Piecework Tasks State (ثبت کار در منزل / کارمزدی و قطعه‌کاری)
+  const [isHomeworkModalOpen, setIsHomeworkModalOpen] = useState(false);
+  const [homeworkTaskType, setHomeworkTaskType] = useState(currentEmployee?.homeworkDefaultTaskType || 'مونتاژ قطعات و اتصالات');
+  const [homeworkQuantity, setHomeworkQuantity] = useState<number | ''>(10);
+  const [homeworkUnit, setHomeworkUnit] = useState('عدد');
+  const [homeworkWagePerUnit, setHomeworkWagePerUnit] = useState<number | ''>(currentEmployee?.homeworkWagePerUnit || 25000);
+  const [homeworkDate, setHomeworkDate] = useState(getTodayShamsi());
+  const [homeworkOrderCode, setHomeworkOrderCode] = useState('');
+  const [homeworkNotes, setHomeworkNotes] = useState('');
+  const [homeworkProofUrl, setHomeworkProofUrl] = useState<string | null>(null);
+  const [homeworkMsg, setHomeworkMsg] = useState<{ success: boolean; text: string } | null>(null);
+  const [isSubmittingHomework, setIsSubmittingHomework] = useState(false);
+  const [isHomeworkHistoryModalOpen, setIsHomeworkHistoryModalOpen] = useState(false);
 
   // Mission Start Clock-In State (شروع به کار در مأموریت خارج از محیط کارگاه)
   const [isMissionModalOpen, setIsMissionModalOpen] = useState(false);
@@ -373,6 +400,75 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
     }
   };
 
+  const handleHomeworkProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 4 * 1024 * 1024) {
+        alert('حجم تصویر نباید بیش از ۴ مگابایت باشد.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setHomeworkProofUrl(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleHomeworkSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentEmployee) return;
+
+    if (!homeworkTaskType.trim()) {
+      setHomeworkMsg({ success: false, text: 'لطفاً شرح یا نوع کار انجام‌شده را مشخص نمایید.' });
+      return;
+    }
+    const qty = Number(homeworkQuantity);
+    const wage = Number(homeworkWagePerUnit);
+    if (isNaN(qty) || qty <= 0) {
+      setHomeworkMsg({ success: false, text: 'میزان یا تعداد کار باید عددی بزرگتر از صفر باشد.' });
+      return;
+    }
+    if (isNaN(wage) || wage < 0) {
+      setHomeworkMsg({ success: false, text: 'نرخ دستمزد هر واحد معتبر نیست.' });
+      return;
+    }
+
+    setIsSubmittingHomework(true);
+    setHomeworkMsg(null);
+    try {
+      const res = StorageService.submitHomeworkTask({
+        employeeId: currentEmployee.id,
+        taskType: homeworkTaskType.trim(),
+        quantity: qty,
+        unit: homeworkUnit,
+        wagePerUnit: wage,
+        date: homeworkDate,
+        orderOrBatchCode: homeworkOrderCode.trim(),
+        notes: homeworkNotes.trim(),
+        receiptOrProofUrl: homeworkProofUrl || undefined,
+      });
+
+      if (res.success) {
+        setHomeworkMsg({ success: true, text: res.message });
+        setTimeout(() => {
+          setIsHomeworkModalOpen(false);
+          setHomeworkNotes('');
+          setHomeworkOrderCode('');
+          setHomeworkProofUrl(null);
+          setHomeworkMsg(null);
+          onRefresh();
+        }, 1400);
+      } else {
+        setHomeworkMsg({ success: false, text: res.message });
+      }
+    } catch {
+      setHomeworkMsg({ success: false, text: 'خطا در ثبت کار در منزل.' });
+    } finally {
+      setIsSubmittingHomework(false);
+    }
+  };
+
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordStatusMsg(null);
@@ -462,9 +558,79 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
     setIsManualModalOpen(true);
   };
 
+  const handleDirectManualAttendance = (customTime?: string) => {
+    if (!currentEmployee) return;
+    const timeToUse = customTime || getCurrentTimeStr();
+    if (!todayRecord?.checkInTime) {
+      const res = StorageService.clockIn(currentEmployee.id, 'MANUAL', undefined, timeToUse);
+      if (res.success) {
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+          try { navigator.vibrate([60, 40, 60]); } catch {}
+        }
+        setClockActionMsg({ success: true, text: `✓ ورود شما در ساعت ${timeToUse} به‌صورت دستی و مستقیم ثبت شد.` });
+        onRefresh();
+      } else {
+        setClockActionMsg({ success: false, text: res.message });
+      }
+    } else if (!todayRecord?.checkOutTime) {
+      const res = StorageService.clockOut(currentEmployee.id, 'MANUAL', undefined, timeToUse);
+      if (res.success) {
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+          try { navigator.vibrate([60, 40, 60]); } catch {}
+        }
+        setClockActionMsg({ success: true, text: `✓ خروج شما در ساعت ${timeToUse} به‌صورت دستی و مستقیم ثبت شد.` });
+        onRefresh();
+      } else {
+        setClockActionMsg({ success: false, text: res.message });
+      }
+    } else {
+      setClockActionMsg({ success: false, text: 'تردد امروز شما قبلاً تکمیل شده است.' });
+    }
+    setTimeout(() => setClockActionMsg(null), 4000);
+  };
+
+  const handleOpenEditTodayAttendance = () => {
+    setEditCheckInTime(todayRecord?.checkInTime || '07:00');
+    setEditCheckOutTime(todayRecord?.checkOutTime || getCurrentTimeStr());
+    setEditNotes(todayRecord?.notes || '');
+    setIsEditTodayAttendanceModalOpen(true);
+  };
+
+  const handleSaveEditTodayAttendance = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentEmployee) return;
+    const res = StorageService.updateTodayAttendanceManual(
+      currentEmployee.id,
+      editCheckInTime,
+      editCheckOutTime,
+      editNotes
+    );
+    setClockActionMsg({ success: res.success, text: res.message });
+    setIsEditTodayAttendanceModalOpen(false);
+    onRefresh();
+    setTimeout(() => setClockActionMsg(null), 4000);
+  };
+
   const handleManualRequestSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentEmployee) return;
+
+    // If employee is authorized for direct manual attendance, record immediately without needing manager review
+    if (currentEmployee.allowManualAttendance) {
+      if (manualType === 'IN') {
+        const res = StorageService.clockIn(currentEmployee.id, 'MANUAL', undefined, manualTime);
+        setClockActionMsg({ success: res.success, text: res.message });
+      } else {
+        const res = StorageService.clockOut(currentEmployee.id, 'MANUAL', undefined, manualTime);
+        setClockActionMsg({ success: res.success, text: res.message });
+      }
+      setIsManualModalOpen(false);
+      setManualReason('');
+      onRefresh();
+      setTimeout(() => setClockActionMsg(null), 4000);
+      return;
+    }
+
     if (!manualReason.trim()) {
       setClockActionMsg({ success: false, text: 'لطفاً علت ثبت دستی را وارد نمایید.' });
       return;
@@ -482,6 +648,7 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
     setIsManualModalOpen(false);
     setManualReason('');
     onRefresh();
+    setTimeout(() => setClockActionMsg(null), 4000);
   };
 
   const myLeaves = leaves.filter((l) => l.employeeId === currentEmployee?.id);
@@ -491,6 +658,11 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
     (e) => e.employeeId === currentEmployee?.id
   );
   const pendingExpensesCount = myExpenses.filter((e) => e.status === 'PENDING_SETTLEMENT').length;
+
+  const myHomeworkTasks: HomeworkTask[] = StorageService.getHomeworkTasks(currentUser).filter(
+    (t) => t.employeeId === currentEmployee?.id
+  );
+  const pendingHomeworkCount = myHomeworkTasks.filter((t) => t.status === 'PENDING').length;
 
   if (!currentEmployee) {
     return (
@@ -626,9 +798,17 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
         {/* Shift & Attendance Status Card (Mint Green Card in Image 3) */}
         <div className="bg-[#F0FDF4] border border-emerald-200 rounded-3xl p-5 space-y-4 shadow-2xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-emerald-800 bg-emerald-100/80 px-2.5 py-1 rounded-xl">
-              امروز
-            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold text-emerald-800 bg-emerald-100/80 px-2.5 py-1 rounded-xl">
+                امروز
+              </span>
+              {currentEmployee.allowManualAttendance && (
+                <span className="text-[10px] font-bold text-teal-900 bg-teal-100/90 border border-teal-300 px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-2xs">
+                  <CheckCircle2 className="w-3 h-3 text-teal-600" />
+                  <span>تردد دستی مستقیم (بدون نیاز به QR)</span>
+                </span>
+              )}
+            </div>
             <div className="w-12 h-12 rounded-full bg-emerald-100/90 text-emerald-700 flex items-center justify-center shadow-2xs">
               <Clock className="w-6 h-6 text-emerald-600" />
             </div>
@@ -706,24 +886,116 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
             )}
           </div>
 
-          {/* Primary Action Button (Big Green Button in Image 3) */}
-          <button
-            type="button"
-            onClick={() => setIsCameraScannerOpen(true)}
-            className="w-full py-3.5 px-4 rounded-2xl bg-[#10B981] hover:bg-[#059669] active:scale-98 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
-          >
-            {isClockedIn ? (
-              <>
-                <LogOut className="w-5 h-5" />
-                <span>{todayRecord?.isMissionStart ? 'ثبت پایان مأموریت و خروج' : 'ثبت خروج با بارکد کارگاه'}</span>
-              </>
-            ) : (
-              <>
-                <LogIn className="w-5 h-5" />
-                <span>ثبت ورود با بارکد کارگاه</span>
-              </>
-            )}
-          </button>
+          {/* Primary Action Button (Direct Manual vs QR Scanner) */}
+          {currentEmployee.allowManualAttendance ? (
+            <div className="space-y-2.5">
+              {isShiftCompleted ? (
+                <div className="space-y-2">
+                  <div className="w-full py-3.5 px-4 rounded-2xl bg-emerald-100/90 border border-emerald-300 text-emerald-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-2xs">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>تردد امروز شما با موفقیت ثبت نهایی شد (ورود: {todayRecord?.checkInTime} | خروج: {todayRecord?.checkOutTime})</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditTodayAttendance()}
+                    className="w-full py-2.5 px-3 rounded-xl bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-900 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                  >
+                    <Edit2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>ویرایش یا اصلاح ساعت تردد دستی امروز</span>
+                  </button>
+                </div>
+              ) : isClockedIn ? (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => handleDirectManualAttendance()}
+                    className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-rose-600 via-rose-700 to-rose-800 hover:from-rose-700 hover:to-rose-900 active:scale-98 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md shadow-rose-600/25 transition-all cursor-pointer"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    <span>ثبت خروج دستی (ساعت جاری)</span>
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenManualRequest('OUT')}
+                      className="flex-1 py-2.5 px-3 rounded-xl bg-white hover:bg-rose-50 border border-rose-300 text-rose-900 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                    >
+                      <Clock className="w-3.5 h-3.5 text-rose-600" />
+                      <span>ثبت خروج با تعیین ساعت دلخواه</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => handleDirectManualAttendance()}
+                    className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 active:scale-98 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md shadow-emerald-600/25 transition-all cursor-pointer"
+                  >
+                    <LogIn className="w-5 h-5" />
+                    <span>ثبت ورود دستی (ساعت جاری)</span>
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenManualRequest('IN')}
+                      className="flex-1 py-2.5 px-3 rounded-xl bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-900 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                    >
+                      <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>ثبت ورود با تعیین ساعت دلخواه</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between text-[11px] text-teal-800 bg-teal-50/80 px-3 py-1.5 rounded-xl border border-teal-200/80">
+                <span className="flex items-center gap-1 font-medium">
+                  <CheckCircle2 className="w-3 h-3 text-teal-600" />
+                  <span>ثبت تردد برای شما صرفاً به‌صورت دستی فعال است و نیازی به اسکن QR ندارید.</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsCameraScannerOpen(true)}
+                  className="text-slate-500 hover:text-slate-800 underline text-[10px] cursor-pointer"
+                  title="در صورت تمایل به اسکن بارکد کارگاه"
+                >
+                  اسکن بارکد
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setIsCameraScannerOpen(true)}
+                className="w-full py-3.5 px-4 rounded-2xl bg-[#10B981] hover:bg-[#059669] active:scale-98 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+              >
+                {isClockedIn ? (
+                  <>
+                    <LogOut className="w-5 h-5" />
+                    <span>{todayRecord?.isMissionStart ? 'ثبت پایان مأموریت و خروج' : 'ثبت خروج با بارکد کارگاه'}</span>
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-5 h-5" />
+                    <span>ثبت ورود با بارکد کارگاه</span>
+                  </>
+                )}
+              </button>
+
+              {/* Secondary Outline Button: Manual Punch Request to manager */}
+              <button
+                type="button"
+                onClick={() => handleOpenManualRequest(isClockedIn ? 'OUT' : 'IN')}
+                className="w-full py-2.5 px-4 rounded-2xl bg-white hover:bg-emerald-50/70 border border-emerald-300 text-emerald-800 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>ثبت دستی توسط مدیر</span>
+              </button>
+            </>
+          )}
 
           {/* Mission Start Button (خارج از محیط کارگاه) */}
           {!isClockedIn && (
@@ -736,16 +1008,6 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
               <span>شروع کار اول وقت در مأموریت (خارج از محیط کارگاه)</span>
             </button>
           )}
-
-          {/* Secondary Outline Button: Manual Punch */}
-          <button
-            type="button"
-            onClick={() => handleOpenManualRequest(isClockedIn ? 'OUT' : 'IN')}
-            className="w-full py-2.5 px-4 rounded-2xl bg-white hover:bg-emerald-50/70 border border-emerald-300 text-emerald-800 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
-          >
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>ثبت دستی توسط مدیر</span>
-          </button>
         </div>
 
         {/* Quick Access Section ("دسترسی سریع" in Image 3) */}
@@ -819,6 +1081,57 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
           </div>
         </div>
 
+        {/* Homework Banner Card (کار در منزل و کارمزدی) */}
+        {currentEmployee.isHomeworkWorker && (
+          <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-purple-950 text-white rounded-3xl p-4 sm:p-5 shadow-md border border-indigo-500/30 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center shrink-0 border border-indigo-400/30">
+                  <Home className="w-5 h-5 text-indigo-300" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs sm:text-sm font-black text-white">کار در منزل و کارمزدی (قطعه‌کاری)</h4>
+                    <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                      مجاز
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    ثبت تعداد قطعات مونتاژ، پرداخت یا بسته‌بندی شده و ارسال برای تایید مدیر
+                  </p>
+                </div>
+              </div>
+              {pendingHomeworkCount > 0 && (
+                <span className="text-[11px] font-mono font-bold px-2 py-1 rounded-xl bg-amber-500 text-slate-950 shadow-xs animate-pulse shrink-0">
+                  {formatNumberFa(pendingHomeworkCount)} در انتظار
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setHomeworkMsg(null);
+                  setIsHomeworkModalOpen(true);
+                }}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-98"
+              >
+                <Plus className="w-4 h-4 text-white" />
+                <span>ثبت کار جدید</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsHomeworkHistoryModalOpen(true)}
+                className="py-2.5 px-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-white/15 active:scale-98"
+              >
+                <FileText className="w-4 h-4 text-indigo-200" />
+                <span>سوابق من ({formatNumberFa(myHomeworkTasks.length)})</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Financial & Work Services Grid ("امور مالی و کاری من" in Image 3) */}
         <div className="space-y-2.5">
           <div className="flex items-center justify-between text-right">
@@ -829,7 +1142,29 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
             </h4>
           </div>
 
-          <div className="grid grid-cols-4 gap-2 sm:gap-2.5">
+          <div className={`grid gap-2 sm:gap-2.5 ${currentEmployee.isHomeworkWorker ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-4'}`}>
+            {/* Service 0: Homework if enabled */}
+            {currentEmployee.isHomeworkWorker && (
+              <div
+                onClick={() => {
+                  setHomeworkMsg(null);
+                  setIsHomeworkModalOpen(true);
+                }}
+                className="relative bg-indigo-50/90 hover:bg-indigo-100 border border-indigo-200/90 rounded-2xl p-3 text-center transition-all cursor-pointer flex flex-col items-center justify-between gap-1 shadow-2xs active:scale-98"
+              >
+                {pendingHomeworkCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center shadow-xs">
+                    {pendingHomeworkCount}
+                  </span>
+                )}
+                <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                  <Home className="w-4 h-4 text-indigo-600" />
+                </div>
+                <span className="text-[11px] font-extrabold text-slate-800 leading-tight">کار در منزل</span>
+                <span className="text-[9px] text-indigo-700 font-medium">ثبت قطعات</span>
+              </div>
+            )}
+
             {/* Service 1: Personal Purchase */}
             <div
               onClick={() => setIsExpenseModalOpen(true)}
@@ -896,6 +1231,44 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
           </div>
 
           <div className="space-y-2">
+            {/* Record 0: Latest Homework Task */}
+            {myHomeworkTasks.length > 0 && (
+              <div
+                onClick={() => setIsHomeworkHistoryModalOpen(true)}
+                className="p-3 bg-indigo-50/70 hover:bg-indigo-100/70 border border-indigo-100 rounded-2xl flex items-center justify-between text-xs cursor-pointer transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${
+                    myHomeworkTasks[0].status === 'SETTLED'
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      : myHomeworkTasks[0].status === 'ADDED_TO_SALARY'
+                      ? 'bg-blue-100 text-blue-800 border-blue-300'
+                      : myHomeworkTasks[0].status === 'REJECTED'
+                      ? 'bg-rose-100 text-rose-800 border-rose-300'
+                      : 'bg-amber-100 text-amber-800 border-amber-300'
+                  }`}>
+                    {myHomeworkTasks[0].status === 'SETTLED' ? 'تسویه نقدی شد' :
+                     myHomeworkTasks[0].status === 'ADDED_TO_SALARY' ? 'به فیش حقوق اضافه شد' :
+                     myHomeworkTasks[0].status === 'REJECTED' ? 'رد شد' : 'در انتظار تایید مدیر'}
+                  </span>
+                  <span className="font-mono font-bold text-slate-800">
+                    {formatCurrencyTomans(myHomeworkTasks[0].totalWage)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="text-right">
+                    <span className="font-bold text-slate-800 block">کار در منزل: {myHomeworkTasks[0].taskType}</span>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      {formatNumberFa(myHomeworkTasks[0].quantity)} {myHomeworkTasks[0].unit} • {myHomeworkTasks[0].date}
+                    </span>
+                  </div>
+                  <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                    <Home className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Record 1: Today Clock */}
             <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between text-xs">
               <span className="font-mono font-bold text-slate-800">
@@ -1120,7 +1493,7 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
         allEmployees={employees}
       />
 
-      {/* Manual Attendance Request Modal */}
+      {/* Manual Attendance Modal */}
       {isManualModalOpen && (
         <div
           className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
@@ -1139,36 +1512,55 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
                 <X className="w-4 h-4" />
               </button>
               <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-                <span>درخواست ثبت تردد دستی ({manualType === 'IN' ? 'ورود' : 'خروج'})</span>
-                <Clock className="w-4 h-4 text-indigo-600" />
+                <span>
+                  {currentEmployee.allowManualAttendance ? 'ثبت مستقیم تردد دستی' : 'درخواست ثبت تردد دستی'} ({manualType === 'IN' ? 'ورود' : 'خروج'})
+                </span>
+                {currentEmployee.allowManualAttendance ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                ) : (
+                  <Clock className="w-4 h-4 text-indigo-600" />
+                )}
               </h3>
             </div>
+
+            {currentEmployee.allowManualAttendance && (
+              <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs text-emerald-900 flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <span>
+                  دسترسی ثبت تردد دستی برای شما فعال است؛ با تایید این فرم، تردد {manualType === 'IN' ? 'ورود' : 'خروج'} شما مستقیماً و بدون نیاز به QR یا تایید ناظر ثبت خواهد شد.
+                </span>
+              </div>
+            )}
 
             <form onSubmit={handleManualRequestSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  ساعت تردد:
+                  ساعت {manualType === 'IN' ? 'ورود' : 'خروج'}:
                 </label>
                 <input
                   type="time"
                   required
                   value={manualTime}
                   onChange={(e) => setManualTime(e.target.value)}
-                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 font-mono text-center focus:border-indigo-600 outline-none"
+                  className="w-full text-sm p-2.5 rounded-xl border border-slate-200 font-mono text-center focus:border-emerald-600 outline-none font-bold"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  علت ثبت دستی:
+                  {currentEmployee.allowManualAttendance ? 'یادداشت یا توضیحات (اختیاری):' : 'علت ثبت دستی:'}
                 </label>
                 <textarea
-                  required
-                  rows={3}
+                  required={!currentEmployee.allowManualAttendance}
+                  rows={2}
                   value={manualReason}
                   onChange={(e) => setManualReason(e.target.value)}
-                  placeholder="مثال: قطعی شارژ گوشی یا عدم همراه داشتن بارکد..."
-                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:border-indigo-600 outline-none"
+                  placeholder={
+                    currentEmployee.allowManualAttendance
+                      ? 'اختیاری - در صورت تمایل توضیحی بنویسید...'
+                      : 'مثال: قطعی شارژ گوشی یا عدم همراه داشتن بارکد...'
+                  }
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:border-emerald-600 outline-none"
                 />
               </div>
 
@@ -1182,9 +1574,102 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer shadow-xs"
+                  className={`px-5 py-2.5 rounded-xl text-xs font-bold text-white cursor-pointer shadow-xs transition-colors ${
+                    currentEmployee.allowManualAttendance
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-indigo-600 hover:bg-indigo-700'
+                  }`}
                 >
-                  ارسال درخواست به سرپرست
+                  {currentEmployee.allowManualAttendance ? '✓ ثبت قطعی تردد دستی' : 'ارسال درخواست به سرپرست'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Today Attendance Modal (برای پرسنل دارای دسترسی دستی) */}
+      {isEditTodayAttendanceModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => setIsEditTodayAttendanceModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 border border-slate-200 shadow-2xl animate-in zoom-in-95 text-right cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <button
+                type="button"
+                onClick={() => setIsEditTodayAttendanceModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+                <span>ویرایش ساعت تردد امروز</span>
+                <Edit2 className="w-4 h-4 text-emerald-600" />
+              </h3>
+            </div>
+
+            <p className="text-xs text-slate-500 leading-relaxed">
+              شما می‌توانید ساعت ورود و خروج ثبت‌شده برای شیفت امروز را مستقیماً ویرایش و اصلاح نمایید.
+            </p>
+
+            <form onSubmit={handleSaveEditTodayAttendance} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    ساعت ورود:
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={editCheckInTime}
+                    onChange={(e) => setEditCheckInTime(e.target.value)}
+                    className="w-full text-sm p-2.5 rounded-xl border border-slate-200 font-mono text-center focus:border-emerald-600 outline-none font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    ساعت خروج:
+                  </label>
+                  <input
+                    type="time"
+                    value={editCheckOutTime}
+                    onChange={(e) => setEditCheckOutTime(e.target.value)}
+                    className="w-full text-sm p-2.5 rounded-xl border border-slate-200 font-mono text-center focus:border-emerald-600 outline-none font-bold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  توضیح یا علت اصلاح (اختیاری):
+                </label>
+                <input
+                  type="text"
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  placeholder="مثال: اصلاح به علت فراموشی در ثبت لحظه‌ای..."
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:border-emerald-600 outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEditTodayAttendanceModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  انصراف
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-xs transition-colors"
+                >
+                  ✓ ذخیره اصلاحات تردد
                 </button>
               </div>
             </form>
@@ -1417,6 +1902,344 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
                   </div>
                 ))
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. HOMEWORK / PIECEWORK SUBMISSION MODAL */}
+      {isHomeworkModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => setIsHomeworkModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 border border-slate-200 shadow-2xl animate-in zoom-in-95 text-right cursor-default max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <button
+                type="button"
+                onClick={() => setIsHomeworkModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <h3 className="font-bold text-sm sm:text-base text-slate-800 flex items-center gap-2">
+                <span>ثبت گزارش کار در منزل / کارمزدی</span>
+                <Home className="w-5 h-5 text-indigo-600" />
+              </h3>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-indigo-50/70 border border-indigo-100 text-indigo-900 text-xs leading-relaxed">
+              تعداد قطعات یا مقدار کاری که در منزل انجام داده‌اید را ثبت کنید. مبلغ دستمزد به صورت خودکار محاسبه شده و پس از ارسال، توسط مدیر جهت تسویه یا اضافه به فیش این دوره تایید خواهد شد.
+            </div>
+
+            {homeworkMsg && (
+              <div className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+                homeworkMsg.success ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'
+              }`}>
+                <span>{homeworkMsg.text}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleHomeworkSubmit} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  نوع کار انجام‌شده: <span className="text-rose-500">*</span>
+                </label>
+                <div className="space-y-1.5">
+                  <select
+                    value={homeworkTaskType}
+                    onChange={(e) => setHomeworkTaskType(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-white focus:border-indigo-600 outline-none"
+                  >
+                    <option value="مونتاژ قطعات و اتصالات">مونتاژ قطعات و اتصالات</option>
+                    <option value="سنباده‌کاری و پرداخت دستی چوب">سنباده‌کاری و پرداخت دستی چوب</option>
+                    <option value="رنگ‌کاری، سیلر و کیلر قطعات">رنگ‌کاری، سیلر و کیلر قطعات</option>
+                    <option value="دوخت کاور و کیف محافظ تخته‌نرد">دوخت کاور و کیف محافظ تخته‌نرد</option>
+                    <option value="پلی‌کردن و پولیش مهره‌ها و تاس‌ها">پلی‌کردن و پولیش مهره‌ها و تاس‌ها</option>
+                    <option value="بسته‌بندی نهایی و جعبه‌چینی">بسته‌بندی نهایی و جعبه‌چینی</option>
+                    <option value="کنترل کیفیت و عیب‌یابی ظاهری">کنترل کیفیت و عیب‌یابی ظاهری</option>
+                    <option value="سایر کارهای تولیدی کارمزد">سایر کارهای تولیدی کارمزد</option>
+                  </select>
+                  {homeworkTaskType === 'سایر کارهای تولیدی کارمزد' && (
+                    <input
+                      type="text"
+                      required
+                      placeholder="عنوان یا شرح کار را بنویسید..."
+                      className="w-full text-xs p-2.5 rounded-xl border border-indigo-200 bg-indigo-50/50 focus:border-indigo-600 outline-none"
+                      onChange={(e) => setHomeworkTaskType(e.target.value)}
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    تعداد / مقدار: <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    required
+                    value={homeworkQuantity}
+                    onChange={(e) => {
+                      const raw = toEnglishDigits(e.target.value).replace(/\D/g, '');
+                      setHomeworkQuantity(raw ? Number(raw) : '');
+                    }}
+                    placeholder="مثال: ۵۰"
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 font-mono text-left focus:border-indigo-600 outline-none font-bold"
+                    dir="ltr"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    واحد سنجش:
+                  </label>
+                  <select
+                    value={homeworkUnit}
+                    onChange={(e) => setHomeworkUnit(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-white focus:border-indigo-600 outline-none"
+                  >
+                    <option value="عدد">عدد</option>
+                    <option value="قطعه">قطعه</option>
+                    <option value="ست">ست</option>
+                    <option value="جعبه">جعبه</option>
+                    <option value="کیلوگرم">کیلوگرم</option>
+                    <option value="متر">متر</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    نرخ هر واحد (تومان): <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    required
+                    value={homeworkWagePerUnit}
+                    onChange={(e) => {
+                      const raw = toEnglishDigits(e.target.value).replace(/\D/g, '');
+                      setHomeworkWagePerUnit(raw ? Number(raw) : '');
+                    }}
+                    placeholder="مثال: ۲۵,۰۰۰"
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 font-mono text-left focus:border-indigo-600 outline-none font-bold"
+                    dir="ltr"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    تاریخ انجام کار:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={homeworkDate}
+                    onChange={(e) => setHomeworkDate(toEnglishDigits(e.target.value))}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 font-mono text-left focus:border-indigo-600 outline-none"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+
+              {/* Live Computed Total Earnings Display */}
+              {Number(homeworkQuantity) > 0 && Number(homeworkWagePerUnit) > 0 && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs animate-in fade-in">
+                  <span className="text-emerald-900 font-medium">مجموع دستمزد این کار:</span>
+                  <span className="font-mono font-black text-emerald-700 text-sm">
+                    {formatCurrencyTomans(Number(homeworkQuantity) * Number(homeworkWagePerUnit))}
+                  </span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    شماره سفارش / بارکد بچ (اختیاری):
+                  </label>
+                  <input
+                    type="text"
+                    value={homeworkOrderCode}
+                    onChange={(e) => setHomeworkOrderCode(e.target.value)}
+                    placeholder="مثال: پارت ۱۲ یا سفارش #408"
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:border-indigo-600 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    توضیحات (اختیاری):
+                  </label>
+                  <input
+                    type="text"
+                    value={homeworkNotes}
+                    onChange={(e) => setHomeworkNotes(e.target.value)}
+                    placeholder="شرح قطعات یا وضعیت تحویل"
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:border-indigo-600 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  عکس از قطعات آماده شده / رسید تحویل (اختیاری):
+                </label>
+                <label className="border-2 border-dashed border-slate-200 hover:border-indigo-400 p-3 rounded-2xl flex items-center justify-center gap-2 cursor-pointer bg-slate-50 text-xs text-slate-600 transition-colors">
+                  <Camera className="w-4 h-4 text-indigo-600" />
+                  <span>{homeworkProofUrl ? '✓ عکس پیوست انتخاب شد' : 'انتخاب یا گرفتن عکس از قطعات/رسید'}</span>
+                  <input type="file" accept="image/*" onChange={handleHomeworkProofUpload} className="hidden" />
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsHomeworkModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  انصراف
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingHomework}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <Home className="w-4 h-4" />
+                  <span>{isSubmittingHomework ? 'در حال ارسال...' : 'ارسال گزارش برای تایید و تسویه'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 9. HOMEWORK / PIECEWORK HISTORY MODAL */}
+      {isHomeworkHistoryModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => setIsHomeworkHistoryModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 border border-slate-200 shadow-2xl animate-in zoom-in-95 text-right max-h-[85vh] overflow-y-auto cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <button
+                type="button"
+                onClick={() => setIsHomeworkHistoryModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <h3 className="font-bold text-sm sm:text-base text-slate-800 flex items-center gap-2">
+                <span>سوابق کارهای در منزل و کارمزدی من</span>
+                <Home className="w-5 h-5 text-indigo-600" />
+              </h3>
+            </div>
+
+            {/* Quick summary stats */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl">
+                <span className="text-[11px] text-indigo-700 block">کل کارهای ثبت‌شده:</span>
+                <span className="text-base font-black text-indigo-950 font-mono">
+                  {formatNumberFa(myHomeworkTasks.length)} مورد
+                </span>
+              </div>
+              <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                <span className="text-[11px] text-emerald-700 block">در انتظار بررسی:</span>
+                <span className="text-base font-black text-emerald-950 font-mono">
+                  {formatNumberFa(pendingHomeworkCount)} مورد
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2.5">
+              {myHomeworkTasks.length === 0 ? (
+                <div className="text-center py-8 text-xs text-slate-400">
+                  هنوز هیچ کار در منزلی توسط شما ثبت نشده است.
+                </div>
+              ) : (
+                myHomeworkTasks.map((task) => (
+                  <div key={task.id} className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className={`px-2.5 py-1 rounded-xl text-[10px] font-bold border ${
+                        task.status === 'SETTLED'
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : task.status === 'ADDED_TO_SALARY'
+                          ? 'bg-blue-100 text-blue-800 border-blue-300'
+                          : task.status === 'REJECTED'
+                          ? 'bg-rose-100 text-rose-800 border-rose-300'
+                          : 'bg-amber-100 text-amber-800 border-amber-300'
+                      }`}>
+                        {task.status === 'SETTLED' ? 'تسویه نقدی شد' :
+                         task.status === 'ADDED_TO_SALARY' ? 'افزوده به فیش حقوقی دوره' :
+                         task.status === 'REJECTED' ? 'رد شد' : 'در انتظار بررسی مدیر'}
+                      </span>
+                      <span className="font-bold text-slate-800 text-sm">{task.taskType}</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 bg-white p-2 rounded-xl border border-slate-100">
+                      <div>
+                        <span>مقدار کار: </span>
+                        <strong className="font-mono text-slate-900">{formatNumberFa(task.quantity)} {task.unit}</strong>
+                      </div>
+                      <div>
+                        <span>نرخ واحد: </span>
+                        <strong className="font-mono text-slate-900">{formatCurrencyTomans(task.wagePerUnit)}</strong>
+                      </div>
+                      <div>
+                        <span>تاریخ انجام: </span>
+                        <strong className="font-mono text-slate-900">{task.date}</strong>
+                      </div>
+                      <div>
+                        <span>کل دستمزد: </span>
+                        <strong className="font-mono text-indigo-700 font-black">{formatCurrencyTomans(task.totalWage)}</strong>
+                      </div>
+                    </div>
+
+                    {task.orderOrBatchCode && (
+                      <div className="text-[11px] text-slate-500">
+                        کد سفارش / پارت: <span className="font-mono font-medium text-slate-700">{task.orderOrBatchCode}</span>
+                      </div>
+                    )}
+
+                    {task.notes && (
+                      <div className="text-[11px] text-slate-600 bg-slate-100/70 p-2 rounded-xl">
+                        توضیحات پرسنل: {task.notes}
+                      </div>
+                    )}
+
+                    {task.settlementNotes && (
+                      <div className="text-[11px] text-emerald-800 bg-emerald-50 p-2 rounded-xl border border-emerald-100">
+                        توضیحات مدیر ({task.settledBy}): {task.settlementNotes} (زمان: {task.settledAt})
+                      </div>
+                    )}
+
+                    {task.rejectionReason && (
+                      <div className="text-[11px] text-rose-800 bg-rose-50 p-2 rounded-xl border border-rose-100">
+                        دلیل رد: {task.rejectionReason}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsHomeworkHistoryModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer"
+              >
+                بستن
+              </button>
             </div>
           </div>
         </div>

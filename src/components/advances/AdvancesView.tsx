@@ -15,14 +15,20 @@ import {
   Image as ImageIcon,
   PlusCircle,
   Coins,
-  Eye
+  Eye,
+  Home,
+  Search,
+  Filter,
+  Layers
 } from 'lucide-react';
-import { AdvanceRequest, Employee, User, WorkerExpense, MiscPayment } from '../../types';
+import { AdvanceRequest, Employee, User, WorkerExpense, MiscPayment, HomeworkTask, HomeworkTaskStatus } from '../../types';
 import { StorageService } from '../../services/storage';
 import {
   formatCurrencyTomans,
+  formatNumberFa,
   getTodayShamsi,
   getTodayShamsiDetailed,
+  toEnglishDigits
 } from '../../utils/dateUtils';
 
 interface AdvancesViewProps {
@@ -89,10 +95,132 @@ export const AdvancesView: React.FC<AdvancesViewProps> = ({
     return true;
   });
 
-  const [activeSection, setActiveSection] = useState<'ADVANCES' | 'MISC_PAYMENTS' | 'EXPENSES'>('ADVANCES');
+  const [activeSection, setActiveSection] = useState<'ADVANCES' | 'MISC_PAYMENTS' | 'EXPENSES' | 'HOMEWORK'>('ADVANCES');
   const [settlingExpense, setSettlingExpense] = useState<WorkerExpense | null>(null);
   const [settlementNotes, setSettlementNotes] = useState('');
   const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
+
+  // Homework Tasks State (کار در منزل و کارمزدی)
+  const [homeworkStatusFilter, setHomeworkStatusFilter] = useState<'ALL' | 'PENDING' | 'SETTLED' | 'ADDED_TO_SALARY' | 'REJECTED'>('ALL');
+  const [homeworkEmployeeFilter, setHomeworkEmployeeFilter] = useState<string>('ALL');
+  const [homeworkSearch, setHomeworkSearch] = useState<string>('');
+  const [rejectingHomeworkTask, setRejectingHomeworkTask] = useState<HomeworkTask | null>(null);
+  const [homeworkRejectionReason, setHomeworkRejectionReason] = useState<string>('');
+  const [isManagerAddHomeworkModalOpen, setIsManagerAddHomeworkModalOpen] = useState(false);
+  const [managerHomeworkForm, setManagerHomeworkForm] = useState<{
+    employeeId: string;
+    taskType: string;
+    quantity: number | '';
+    unit: string;
+    wagePerUnit: number | '';
+    date: string;
+    orderCode: string;
+    notes: string;
+    decision: 'PENDING' | 'SETTLE_NOW' | 'ADD_TO_SALARY';
+  }>({
+    employeeId: employees.find(e => e.isHomeworkWorker)?.id || employees[0]?.id || '',
+    taskType: 'مونتاژ قطعات و اتصالات',
+    quantity: 10,
+    unit: 'عدد',
+    wagePerUnit: 25000,
+    date: getTodayShamsi(),
+    orderCode: '',
+    notes: '',
+    decision: 'PENDING',
+  });
+  const [managerHomeworkMsg, setManagerHomeworkMsg] = useState<{ success: boolean; text: string } | null>(null);
+
+  const homeworkTasks = StorageService.getHomeworkTasks(currentUser);
+  const pendingHomeworkTasks = homeworkTasks.filter((t) => t.status === 'PENDING');
+  const pendingHomeworkCount = pendingHomeworkTasks.length;
+  const totalPendingHomeworkWage = pendingHomeworkTasks.reduce((sum, t) => sum + t.totalWage, 0);
+  const totalSettledHomeworkWage = homeworkTasks.filter((t) => t.status === 'SETTLED').reduce((sum, t) => sum + t.totalWage, 0);
+  const totalAddedToSalaryHomeworkWage = homeworkTasks.filter((t) => t.status === 'ADDED_TO_SALARY').reduce((sum, t) => sum + t.totalWage, 0);
+
+  const filteredHomeworkTasks = homeworkTasks.filter((t) => {
+    if (homeworkStatusFilter !== 'ALL' && t.status !== homeworkStatusFilter) return false;
+    if (homeworkEmployeeFilter !== 'ALL' && t.employeeId !== homeworkEmployeeFilter) return false;
+    if (homeworkSearch.trim()) {
+      const q = homeworkSearch.trim().toLowerCase();
+      const matchName = t.employeeName.toLowerCase().includes(q);
+      const matchType = t.taskType.toLowerCase().includes(q);
+      const matchOrder = t.orderCode ? t.orderCode.toLowerCase().includes(q) : false;
+      const matchNotes = t.notes ? t.notes.toLowerCase().includes(q) : false;
+      if (!matchName && !matchType && !matchOrder && !matchNotes) return false;
+    }
+    return true;
+  });
+
+  const handleHomeworkAction = (
+    taskId: string,
+    action: 'SETTLE_NOW' | 'ADD_TO_SALARY' | 'REJECT',
+    reason?: string
+  ) => {
+    StorageService.reviewHomeworkTask(taskId, action, currentUser.name, reason);
+    if (action === 'REJECT') {
+      setRejectingHomeworkTask(null);
+      setHomeworkRejectionReason('');
+    }
+    onRefresh();
+  };
+
+  const handleManagerAddHomeworkSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!managerHomeworkForm.employeeId) {
+      setManagerHomeworkMsg({ success: false, text: 'لطفاً پرسنل مورد نظر را انتخاب کنید.' });
+      return;
+    }
+    if (!managerHomeworkForm.taskType.trim()) {
+      setManagerHomeworkMsg({ success: false, text: 'نوع یا شرح کار را وارد نمایید.' });
+      return;
+    }
+    if (!managerHomeworkForm.quantity || Number(managerHomeworkForm.quantity) <= 0) {
+      setManagerHomeworkMsg({ success: false, text: 'تعداد یا مقدار کار باید بزرگتر از صفر باشد.' });
+      return;
+    }
+    if (!managerHomeworkForm.wagePerUnit || Number(managerHomeworkForm.wagePerUnit) <= 0) {
+      setManagerHomeworkMsg({ success: false, text: 'نرخ دستمزد هر واحد باید بزرگتر از صفر باشد.' });
+      return;
+    }
+
+    const res = StorageService.submitHomeworkTask({
+      employeeId: managerHomeworkForm.employeeId,
+      taskType: managerHomeworkForm.taskType.trim(),
+      quantity: Number(managerHomeworkForm.quantity),
+      unit: managerHomeworkForm.unit,
+      wagePerUnit: Number(managerHomeworkForm.wagePerUnit),
+      date: managerHomeworkForm.date,
+      orderCode: managerHomeworkForm.orderCode.trim() || undefined,
+      notes: managerHomeworkForm.notes.trim() || undefined,
+    });
+
+    if (res.success && res.task) {
+      if (managerHomeworkForm.decision === 'SETTLE_NOW') {
+        StorageService.reviewHomeworkTask(res.task.id, 'SETTLE_NOW', currentUser.name, 'تسویه نقدی فوری توسط ثبت‌کننده');
+      } else if (managerHomeworkForm.decision === 'ADD_TO_SALARY') {
+        StorageService.reviewHomeworkTask(res.task.id, 'ADD_TO_SALARY', currentUser.name, 'افزودن مستقیم به فیش حقوقی دوره');
+      }
+      setManagerHomeworkMsg({ success: true, text: 'کار در منزل با موفقیت ثبت گردید.' });
+      setTimeout(() => {
+        setIsManagerAddHomeworkModalOpen(false);
+        setManagerHomeworkMsg(null);
+        setManagerHomeworkForm({
+          employeeId: employees.find(e => e.isHomeworkWorker)?.id || employees[0]?.id || '',
+          taskType: 'مونتاژ قطعات و اتصالات',
+          quantity: 10,
+          unit: 'عدد',
+          wagePerUnit: 25000,
+          date: getTodayShamsi(),
+          orderCode: '',
+          notes: '',
+          decision: 'PENDING',
+        });
+        onRefresh();
+      }, 1000);
+    } else {
+      setManagerHomeworkMsg({ success: false, text: res.message || 'خطا در ثبت کار در منزل.' });
+    }
+  };
 
   // Miscellaneous Payments State
   const [isMiscModalOpen, setIsMiscModalOpen] = useState(false);
@@ -248,10 +376,15 @@ export const AdvancesView: React.FC<AdvancesViewProps> = ({
                 <Coins className="w-5 h-5 text-amber-600" />
                 <span>پرداخت‌های متفرقه و علی‌الحساب مدیریت</span>
               </>
-            ) : (
+            ) : activeSection === 'EXPENSES' ? (
               <>
                 <Receipt className="w-5 h-5 text-emerald-600" />
                 <span>خریدهای کارت شخصی کارگران (بستانکاری کارگاه)</span>
+              </>
+            ) : (
+              <>
+                <Home className="w-5 h-5 text-indigo-600" />
+                <span>کار در منزل، کارمزدی و قطعه‌کاری پرسنل</span>
               </>
             )}
           </h2>
@@ -260,7 +393,9 @@ export const AdvancesView: React.FC<AdvancesViewProps> = ({
               ? 'فرآیند درخواست، اعتبارسنجی سقف ۳۰٪ و تایید کسر از حقوق پایان ماه'
               : activeSection === 'MISC_PAYMENTS'
               ? 'ثبت پرداخت‌های علی‌الحساب یا متفرقه کارفرما با تعیین وضعیت کسر از حقوق'
-              : 'هزینه‌های انجام‌شده با کارت شخصی کارگران برای کارگاه و مدیریت تسویه فوری، افزودن به حقوق یا رد'}
+              : activeSection === 'EXPENSES'
+              ? 'هزینه‌های انجام‌شده با کارت شخصی کارگران برای کارگاه و مدیریت تسویه فوری، افزودن به حقوق یا رد'
+              : 'گزارش‌های کار در منزل و قطعه‌کاری پرسنل با امکان تسویه نقدی فوری، افزودن به حقوق ماه جاری یا رد'}
           </p>
         </div>
 
@@ -285,6 +420,19 @@ export const AdvancesView: React.FC<AdvancesViewProps> = ({
             >
               <Plus className="w-4 h-4 text-white" />
               <span>ثبت پرداخت متفرقه / علی‌الحساب</span>
+            </button>
+          )}
+
+          {activeSection === 'HOMEWORK' && canApprove && (
+            <button
+              onClick={() => {
+                setManagerHomeworkMsg(null);
+                setIsManagerAddHomeworkModalOpen(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-all shadow-xs cursor-pointer"
+            >
+              <Plus className="w-4 h-4 text-white" />
+              <span>ثبت مستقیم کار در منزل</span>
             </button>
           )}
         </div>
@@ -340,6 +488,24 @@ export const AdvancesView: React.FC<AdvancesViewProps> = ({
           {pendingExpensesCount > 0 && (
             <span className="bg-amber-500 text-slate-950 font-mono text-[10px] px-1.5 py-0.2 rounded-full">
               {pendingExpensesCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSection('HOMEWORK')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeSection === 'HOMEWORK'
+              ? 'bg-indigo-900 text-white shadow-xs'
+              : 'bg-white text-indigo-950 hover:bg-indigo-50 border border-indigo-200/80'
+          }`}
+        >
+          <Home className="w-4 h-4 text-indigo-400" />
+          <span>کار در منزل و کارمزدی</span>
+          {pendingHomeworkCount > 0 && (
+            <span className="bg-rose-500 text-white font-mono text-[10px] px-1.5 py-0.2 rounded-full animate-pulse">
+              {pendingHomeworkCount}
             </span>
           )}
         </button>
@@ -786,7 +952,399 @@ export const AdvancesView: React.FC<AdvancesViewProps> = ({
         </div>
       )}
 
-      {/* REJECT MODAL */}
+      {/* SECTION 4: HOMEWORK & PIECEWORK TASKS */}
+      {activeSection === 'HOMEWORK' && (
+        <div className="space-y-4">
+          {/* Header Summary Banner */}
+          <div className="bg-gradient-to-r from-indigo-50/90 via-purple-50/80 to-blue-50/90 border border-indigo-200/80 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs text-indigo-950 shadow-2xs">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Home className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <span className="font-black text-sm text-indigo-950 block">
+                  سامانه کار در منزل، کارمزدی و قطعه‌کاری کارگاه
+                </span>
+                <p className="text-slate-600 leading-relaxed max-w-2xl">
+                  ثبت و تعیین‌تکلیف فعالیت‌های برون‌سپاری‌شده به پرسنل در منزل. مدیریت می‌تواند مطالبات را به‌صورت <strong className="text-emerald-700">«تسویه نقدی فوری»</strong>، <strong className="text-indigo-700">«افزودن به حقوق ماه جاری»</strong> (بدون تغییر در پایه حقوق) و یا <strong className="text-rose-700">«رد»</strong> تعیین‌تکلیف نماید.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Stat Chips */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 shrink-0">
+              <div className="bg-white/90 p-2.5 rounded-xl border border-indigo-200/80 shadow-2xs">
+                <span className="text-[10px] text-slate-500 block font-medium">در انتظار بررسی:</span>
+                <div className="font-mono font-black text-rose-600 text-xs mt-0.5">
+                  {formatCurrencyTomans(totalPendingHomeworkWage)}
+                </div>
+                <span className="text-[9px] text-rose-700 font-bold block mt-0.5">
+                  {formatNumberFa(pendingHomeworkCount)} مورد باز
+                </span>
+              </div>
+
+              <div className="bg-white/90 p-2.5 rounded-xl border border-indigo-200/80 shadow-2xs">
+                <span className="text-[10px] text-slate-500 block font-medium">تسویه نقدی فوری:</span>
+                <div className="font-mono font-black text-emerald-700 text-xs mt-0.5">
+                  {formatCurrencyTomans(totalSettledHomeworkWage)}
+                </div>
+                <span className="text-[9px] text-emerald-700 font-bold block mt-0.5">پرداخت مستقیم</span>
+              </div>
+
+              <div className="bg-white/90 p-2.5 rounded-xl border border-indigo-200/80 shadow-2xs col-span-2 sm:col-span-1">
+                <span className="text-[10px] text-slate-500 block font-medium">افزوده‌شده به فیش حقوق:</span>
+                <div className="font-mono font-black text-indigo-700 text-xs mt-0.5">
+                  {formatCurrencyTomans(totalAddedToSalaryHomeworkWage)}
+                </div>
+                <span className="text-[9px] text-indigo-700 font-bold block mt-0.5">ردیف مستقل در فیش</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Filtering and Search Controls */}
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+            {/* Status Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+              <button
+                type="button"
+                onClick={() => setHomeworkStatusFilter('ALL')}
+                className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  homeworkStatusFilter === 'ALL'
+                    ? 'bg-indigo-900 text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                همه ({formatNumberFa(homeworkTasks.length)})
+              </button>
+              <button
+                type="button"
+                onClick={() => setHomeworkStatusFilter('PENDING')}
+                className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1 ${
+                  homeworkStatusFilter === 'PENDING'
+                    ? 'bg-amber-600 text-white shadow-2xs'
+                    : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
+                }`}
+              >
+                <span>در انتظار ({formatNumberFa(pendingHomeworkCount)})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setHomeworkStatusFilter('SETTLED')}
+                className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  homeworkStatusFilter === 'SETTLED'
+                    ? 'bg-emerald-600 text-white shadow-2xs'
+                    : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+                }`}
+              >
+                تسویه نقدی ({formatNumberFa(homeworkTasks.filter(t => t.status === 'SETTLED').length)})
+              </button>
+              <button
+                type="button"
+                onClick={() => setHomeworkStatusFilter('ADDED_TO_SALARY')}
+                className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  homeworkStatusFilter === 'ADDED_TO_SALARY'
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'bg-indigo-50 text-indigo-800 hover:bg-indigo-100 border border-indigo-200'
+                }`}
+              >
+                افزوده به حقوق ({formatNumberFa(homeworkTasks.filter(t => t.status === 'ADDED_TO_SALARY').length)})
+              </button>
+              <button
+                type="button"
+                onClick={() => setHomeworkStatusFilter('REJECTED')}
+                className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  homeworkStatusFilter === 'REJECTED'
+                    ? 'bg-rose-600 text-white shadow-2xs'
+                    : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200'
+                }`}
+              >
+                رد شده ({formatNumberFa(homeworkTasks.filter(t => t.status === 'REJECTED').length)})
+              </button>
+            </div>
+
+            {/* Employee Filter & Search */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200">
+                <Filter className="w-3.5 h-3.5 text-slate-400" />
+                <select
+                  value={homeworkEmployeeFilter}
+                  onChange={(e) => setHomeworkEmployeeFilter(e.target.value)}
+                  className="bg-transparent text-slate-700 text-xs font-semibold focus:outline-none cursor-pointer"
+                >
+                  <option value="ALL">همه پرسنل</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.firstName} {emp.lastName} {emp.isHomeworkWorker ? '⭐ (کار در منزل)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="جستجو در کارها..."
+                  value={homeworkSearch}
+                  onChange={(e) => setHomeworkSearch(e.target.value)}
+                  className="pr-8 pl-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 focus:outline-none focus:border-indigo-500 w-36 sm:w-44"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Cards for Mobile & Table for Desktop */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            {/* Mobile Cards (block sm:hidden) */}
+            <div className="block sm:hidden divide-y divide-slate-100">
+              {filteredHomeworkTasks.length === 0 ? (
+                <div className="py-10 text-center text-slate-400 text-xs">
+                  هیچ موردی با فیلتر انتخابی یافت نشد.
+                </div>
+              ) : (
+                filteredHomeworkTasks.map((t) => (
+                  <div key={t.id} className="p-3.5 space-y-2.5 text-xs text-right">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
+                          <Home className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="font-bold text-slate-900">{t.employeeName}</span>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${
+                        t.status === 'SETTLED'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                          : t.status === 'ADDED_TO_SALARY'
+                          ? 'bg-blue-50 text-blue-800 border-blue-300'
+                          : t.status === 'REJECTED'
+                          ? 'bg-rose-50 text-rose-800 border-rose-300'
+                          : 'bg-amber-50 text-amber-800 border-amber-300'
+                      }`}>
+                        {t.status === 'SETTLED' ? 'تسویه نقدی' :
+                         t.status === 'ADDED_TO_SALARY' ? 'افزوده به حقوق' :
+                         t.status === 'REJECTED' ? 'رد شده' : 'در انتظار تایید'}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 space-y-1">
+                      <div className="font-bold text-slate-800">{t.taskType}</div>
+                      <div className="flex items-center justify-between text-slate-600 text-[11px]">
+                        <span>مقدار: <strong className="text-slate-900">{formatNumberFa(t.quantity)} {t.unit}</strong></span>
+                        <span>نرخ: {formatCurrencyTomans(t.wagePerUnit)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200/60">
+                        <span className="text-slate-500 font-mono">{t.date} {t.orderCode ? `• عطف: ${t.orderCode}` : ''}</span>
+                        <span className="font-mono font-black text-indigo-700 text-xs">
+                          کل: {formatCurrencyTomans(t.totalWage)}
+                        </span>
+                      </div>
+                      {t.notes && <div className="text-[10px] text-slate-500 pt-0.5">{t.notes}</div>}
+                      {t.rejectionReason && (
+                        <div className="text-[10px] text-rose-600 bg-rose-50 p-1.5 rounded border border-rose-200">
+                          علت رد: {t.rejectionReason}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      {t.proofImageUrl ? (
+                        <button
+                          type="button"
+                          onClick={() => setViewingReceipt(t.proofImageUrl!)}
+                          className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-[11px] flex items-center gap-1 border border-indigo-200 cursor-pointer"
+                        >
+                          <Eye className="w-3 h-3" />
+                          <span>مشاهده عکس کار</span>
+                        </button>
+                      ) : <span className="text-[10px] text-slate-400">بدون تصویر</span>}
+
+                      {canApprove && t.status === 'PENDING' && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleHomeworkAction(t.id, 'SETTLE_NOW')}
+                            className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-600 text-white flex items-center gap-0.5"
+                          >
+                            <Check className="w-3 h-3" />
+                            <span>تسویه</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleHomeworkAction(t.id, 'ADD_TO_SALARY')}
+                            className="px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-600 text-white flex items-center gap-0.5"
+                          >
+                            <PlusCircle className="w-3 h-3" />
+                            <span>به حقوق</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRejectingHomeworkTask(t);
+                              setHomeworkRejectionReason('');
+                            }}
+                            className="px-2 py-1 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200"
+                          >
+                            رد
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Desktop Table (hidden sm:block) */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-right text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100 text-slate-400 font-medium">
+                    <th className="p-3.5 pr-5">پرسنل</th>
+                    <th className="p-3.5">شرح کار / قطعه</th>
+                    <th className="p-3.5">تعداد / متراژ</th>
+                    <th className="p-3.5">نرخ هر واحد (تومان)</th>
+                    <th className="p-3.5">دستمزد کل (تومان)</th>
+                    <th className="p-3.5">تاریخ انجام</th>
+                    <th className="p-3.5">کد سفارش / عطف</th>
+                    <th className="p-3.5">عکس / رسید</th>
+                    <th className="p-3.5">وضعیت</th>
+                    {canApprove && <th className="p-3.5 pl-5 text-left">تصمیم و تسویه مدیر</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredHomeworkTasks.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="py-10 text-center text-slate-400">
+                        هیچ موردی با فیلترهای انتخابی یافت نشد.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredHomeworkTasks.map((t) => (
+                      <tr key={t.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="p-3.5 pr-5 font-bold text-slate-900 whitespace-nowrap">
+                          {t.employeeName}
+                        </td>
+                        <td className="p-3.5 font-medium text-slate-800 max-w-[200px] truncate" title={t.taskType}>
+                          {t.taskType}
+                          {t.notes && <span className="block text-[10px] text-slate-400 truncate">{t.notes}</span>}
+                        </td>
+                        <td className="p-3.5 font-bold font-mono text-slate-700 whitespace-nowrap">
+                          {formatNumberFa(t.quantity)} {t.unit}
+                        </td>
+                        <td className="p-3.5 font-mono text-slate-600 whitespace-nowrap">
+                          {formatCurrencyTomans(t.wagePerUnit)}
+                        </td>
+                        <td className="p-3.5 font-bold font-mono text-indigo-700 whitespace-nowrap">
+                          {formatCurrencyTomans(t.totalWage)}
+                        </td>
+                        <td className="p-3.5 font-mono text-slate-500 whitespace-nowrap">{t.date}</td>
+                        <td className="p-3.5 font-mono text-slate-500 whitespace-nowrap">
+                          {t.orderCode || '-'}
+                        </td>
+                        <td className="p-3.5 whitespace-nowrap">
+                          {t.proofImageUrl ? (
+                            <button
+                              type="button"
+                              onClick={() => setViewingReceipt(t.proofImageUrl!)}
+                              className="px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <Eye className="w-3 h-3 text-indigo-600" />
+                              <span>مشاهده</span>
+                            </button>
+                          ) : (
+                            <span className="text-slate-400 text-[11px]">-</span>
+                          )}
+                        </td>
+                        <td className="p-3.5 whitespace-nowrap">
+                          {t.status === 'PENDING' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                              <AlertCircle className="w-3 h-3" /> در انتظار تایید
+                            </span>
+                          ) : t.status === 'SETTLED' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <CheckCircle className="w-3 h-3" /> تسویه نقدی شده
+                            </span>
+                          ) : t.status === 'ADDED_TO_SALARY' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                              <PlusCircle className="w-3 h-3" /> افزوده‌شده به حقوق
+                            </span>
+                          ) : (
+                            <span
+                              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 cursor-help"
+                              title={t.rejectionReason || 'رد شده توسط مدیریت'}
+                            >
+                              <XCircle className="w-3 h-3" /> رد شده
+                            </span>
+                          )}
+                        </td>
+                        {canApprove && (
+                          <td className="p-3.5 pl-5 text-left whitespace-nowrap">
+                            {t.status === 'PENDING' ? (
+                              <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                <button
+                                  type="button"
+                                  onClick={() => handleHomeworkAction(t.id, 'SETTLE_NOW')}
+                                  className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 flex items-center gap-1 cursor-pointer shadow-2xs"
+                                  title="تسویه حساب نقدی فوری"
+                                >
+                                  <Check className="w-3 h-3" />
+                                  <span>تسویه الآن</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleHomeworkAction(t.id, 'ADD_TO_SALARY')}
+                                  className="px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1 cursor-pointer shadow-2xs"
+                                  title="افزودن دستمزد به فیش حقوقی ماه جاری"
+                                >
+                                  <PlusCircle className="w-3 h-3" />
+                                  <span>افزودن به حقوق</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRejectingHomeworkTask(t);
+                                    setHomeworkRejectionReason('');
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 flex items-center gap-1 cursor-pointer"
+                                  title="رد کار انجام‌شده"
+                                >
+                                  <X className="w-3 h-3" />
+                                  <span>رد</span>
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-end gap-2">
+                                <span className="text-[11px] text-slate-400">
+                                  {t.reviewedBy ? `توسط ${t.reviewedBy}` : 'بررسی شده'}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (confirm('آیا از حذف این رکورد کار در منزل اطمینان دارید؟')) {
+                                      StorageService.deleteHomeworkTask(t.id);
+                                      onRefresh();
+                                    }
+                                  }}
+                                  className="p-1 rounded text-slate-300 hover:text-rose-600 cursor-pointer"
+                                  title="حذف"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REJECT ADVANCE MODAL */}
       {rejectingId && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 p-5 space-y-4 shadow-xl">
@@ -1140,6 +1698,291 @@ export const AdvancesView: React.FC<AdvancesViewProps> = ({
                 >
                   <Coins className="w-3.5 h-3.5" />
                   <span>ثبت نهایی پرداخت</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* REJECT HOMEWORK MODAL */}
+      {rejectingHomeworkTask && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 p-5 space-y-4 shadow-xl text-right">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <XCircle className="w-4 h-4 text-rose-600" />
+                <span>رد کار در منزل: {rejectingHomeworkTask.employeeName}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setRejectingHomeworkTask(null)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              لطفاً علت رد کار در منزل (مانند: نقص کیفی، عدم انطباق با سفارش، مغایرت در تعداد تحویلی) را یادداشت نمایید تا در سوابق پرسنل ثبت شود:
+            </p>
+
+            <textarea
+              rows={3}
+              value={homeworkRejectionReason}
+              onChange={(e) => setHomeworkRejectionReason(e.target.value)}
+              placeholder="توضیحات علت رد..."
+              className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-rose-500 text-slate-800"
+            />
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setRejectingHomeworkTask(null)}
+                className="px-3.5 py-2 rounded-xl text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer"
+              >
+                انصراف
+              </button>
+              <button
+                type="button"
+                onClick={() => handleHomeworkAction(rejectingHomeworkTask.id, 'REJECT', homeworkRejectionReason)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white cursor-pointer shadow-xs"
+              >
+                تایید رد درخواست
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MANAGER DIRECT ADD HOMEWORK MODAL */}
+      {isManagerAddHomeworkModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full border border-slate-200 p-6 space-y-4 shadow-2xl text-right animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                <Home className="w-5 h-5 text-indigo-600" />
+                <span>ثبت مستقیم کار در منزل برای پرسنل</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsManagerAddHomeworkModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {managerHomeworkMsg && (
+              <div
+                className={`p-3 rounded-xl text-xs font-semibold ${
+                  managerHomeworkMsg.success
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                    : 'bg-rose-50 text-rose-800 border border-rose-200'
+                }`}
+              >
+                {managerHomeworkMsg.text}
+              </div>
+            )}
+
+            <form onSubmit={handleManagerAddHomeworkSubmit} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  انتخاب پرسنل مجری:
+                </label>
+                <select
+                  value={managerHomeworkForm.employeeId}
+                  onChange={(e) => {
+                    const emp = employees.find(x => x.id === e.target.value);
+                    setManagerHomeworkForm({
+                      ...managerHomeworkForm,
+                      employeeId: e.target.value,
+                      wagePerUnit: emp?.homeworkWagePerUnit || managerHomeworkForm.wagePerUnit,
+                      taskType: emp?.homeworkDefaultTaskType || managerHomeworkForm.taskType,
+                    });
+                  }}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 bg-white"
+                >
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.firstName} {emp.lastName} {emp.isHomeworkWorker ? '⭐ (دسترسی کار در منزل دارد)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  شرح یا نوع کار انجام‌شده:
+                </label>
+                <input
+                  type="text"
+                  placeholder="مثال: مونتاژ قطعات، دوخت، بسته‌بندی، سوهان‌کاری..."
+                  value={managerHomeworkForm.taskType}
+                  onChange={(e) =>
+                    setManagerHomeworkForm({ ...managerHomeworkForm, taskType: e.target.value })
+                  }
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    تعداد یا مقدار:
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={managerHomeworkForm.quantity}
+                    onChange={(e) =>
+                      setManagerHomeworkForm({
+                        ...managerHomeworkForm,
+                        quantity: e.target.value ? Number(e.target.value) : '',
+                      })
+                    }
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-indigo-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    واحد سنجش:
+                  </label>
+                  <input
+                    type="text"
+                    value={managerHomeworkForm.unit}
+                    onChange={(e) =>
+                      setManagerHomeworkForm({ ...managerHomeworkForm, unit: e.target.value })
+                    }
+                    placeholder="عدد، متر، کیلوگرم، بسته..."
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    نرخ دستمزد هر واحد (تومان):
+                  </label>
+                  <input
+                    type="text"
+                    value={
+                      managerHomeworkForm.wagePerUnit !== ''
+                        ? managerHomeworkForm.wagePerUnit.toLocaleString('fa-IR')
+                        : ''
+                    }
+                    onChange={(e) => {
+                      const raw = toEnglishDigits(e.target.value.replace(/,/g, ''));
+                      setManagerHomeworkForm({
+                        ...managerHomeworkForm,
+                        wagePerUnit: raw ? Number(raw) : '',
+                      });
+                    }}
+                    placeholder="مثال: ۲۵,۰۰۰"
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-indigo-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    تاریخ انجام کار:
+                  </label>
+                  <input
+                    type="text"
+                    value={managerHomeworkForm.date}
+                    onChange={(e) =>
+                      setManagerHomeworkForm({ ...managerHomeworkForm, date: e.target.value })
+                    }
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-indigo-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Total Calculation Preview */}
+              {managerHomeworkForm.quantity && managerHomeworkForm.wagePerUnit ? (
+                <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl flex items-center justify-between text-xs">
+                  <span className="font-bold text-indigo-900">مجموع دستمزد قابل پرداخت:</span>
+                  <span className="font-mono font-black text-indigo-800 text-sm">
+                    {formatCurrencyTomans(
+                      Number(managerHomeworkForm.quantity) * Number(managerHomeworkForm.wagePerUnit)
+                    )}
+                  </span>
+                </div>
+              ) : null}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    شماره سفارش / عطف (اختیاری):
+                  </label>
+                  <input
+                    type="text"
+                    value={managerHomeworkForm.orderCode}
+                    onChange={(e) =>
+                      setManagerHomeworkForm({ ...managerHomeworkForm, orderCode: e.target.value })
+                    }
+                    placeholder="ORD-..."
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    تصمیم تسویه حساب:
+                  </label>
+                  <select
+                    value={managerHomeworkForm.decision}
+                    onChange={(e) =>
+                      setManagerHomeworkForm({
+                        ...managerHomeworkForm,
+                        decision: e.target.value as any,
+                      })
+                    }
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-bold bg-white"
+                  >
+                    <option value="PENDING">در انتظار بررسی</option>
+                    <option value="SETTLE_NOW">تسویه نقدی فوری (پرداخت شد)</option>
+                    <option value="ADD_TO_SALARY">افزودن به حقوق ماه جاری</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  توضیحات و یادداشت (اختیاری):
+                </label>
+                <textarea
+                  rows={2}
+                  value={managerHomeworkForm.notes}
+                  onChange={(e) =>
+                    setManagerHomeworkForm({ ...managerHomeworkForm, notes: e.target.value })
+                  }
+                  placeholder="نکات کنترل کیفیت، تحویل حضوری و ..."
+                  className="w-full text-xs p-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsManagerAddHomeworkModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer"
+                >
+                  انصراف
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer shadow-xs flex items-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>ثبت و ذخیره در پرونده</span>
                 </button>
               </div>
             </form>

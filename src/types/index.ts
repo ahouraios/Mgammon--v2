@@ -146,6 +146,10 @@ export interface Employee {
   workStartTime?: string; // ساعت شروع به کار (مثال: 07:00)
   workEndTime?: string; // ساعت پایان کار (مثال: 16:00)
   thursdayEndTime?: string; // ساعت خروج پنجشنبه (مثال: 13:00)
+  isHomeworkWorker?: boolean; // مجاز به انجام کار در منزل / کارمزدی و قطعه‌کاری
+  homeworkWagePerUnit?: number; // نرخ پیش‌فرض هر واحد کار در منزل (تومان)
+  homeworkDefaultTaskType?: string; // شرح یا نوع کار پیش‌فرض در منزل (اختیاری)
+  allowManualAttendance?: boolean; // مجاز به ثبت تردد مستقیم دستی (بدون نیاز به اسکن بارکد/QR)
 }
 
 export interface Shift {
@@ -254,6 +258,35 @@ export interface WorkerExpense {
   rejectionReason?: string;
 }
 
+// کار در منزل / کارمزدی و قطعه‌کاری پرسنل (تولید، مونتاژ، پرداخت و ...)
+export type HomeworkTaskStatus = 'PENDING' | 'SETTLED' | 'ADDED_TO_SALARY' | 'REJECTED';
+
+export interface HomeworkTask {
+  id: string;
+  companyId: string;
+  employeeId: string;
+  employeeName: string;
+  taskType: string; // نوع کار (مثال: مونتاژ قطعات، سنباده‌زنی، رنگ‌کاری، دوخت کاور، بسته‌بندی، کنترل کیفیت و ...)
+  quantity: number; // تعداد / مقدار / میزان کار انجام‌شده
+  unit: string; // واحد سنجش (عدد، قطعه، ست، جعبه، کیلوگرم، متر)
+  wagePerUnit: number; // نرخ هر واحد به تومان
+  totalWage: number; // کل دستمزد به تومان (quantity * wagePerUnit)
+  date: string; // تاریخ انجام کار (شمسی)
+  orderOrBatchCode?: string; // شماره سفارش / کد پارت یا بچ کاری
+  orderCode?: string; // شناسه یا شماره سفارش
+  notes?: string; // توضیحات پرسنل
+  receiptOrProofUrl?: string; // تصویر پیوست نمونه کار یا رسید تحویل
+  proofImageUrl?: string; // تصویر پیوست نمونه کار
+  status: HomeworkTaskStatus; // 'PENDING' | 'SETTLED' | 'ADDED_TO_SALARY' | 'REJECTED'
+  settlementType?: 'IMMEDIATE' | 'SALARY' | 'REJECTED';
+  settledAt?: string;
+  settledBy?: string;
+  reviewedBy?: string;
+  settlementNotes?: string;
+  rejectionReason?: string;
+  createdAt: string;
+}
+
 // پرداخت‌های متفرقه مدیر به کارگر (علی‌الحساب، پرداخت متفرقه و سایر پرداخت‌ها)
 export interface MiscPayment {
   id: string;
@@ -317,6 +350,7 @@ export interface SalaryRecord {
   advancesTotal: number;
   discretionaryAdvancesTotal?: number; // مساعده خارج از چارچوب مدیریتی
   personalCardExpensesTotal?: number; // هزینه پرداخت‌شده از کارت شخصی کارگر (اضافه‌شده به حقوق)
+  homeworkWagesTotal?: number; // دستمزد کار در منزل و کارمزدی (اضافه‌شده به حقوق دوره جاری - بدون تغییر پایه حقوق)
   miscDeductionsTotal?: number; // کسورات پرداخت‌های متفرقه که گزینه کسر از حقوق فعال بوده
   insuranceDeduction: number;
   taxDeduction: number;

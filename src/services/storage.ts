@@ -16,7 +16,9 @@ import {
   ExpenseStatus,
   MiscPayment,
   WorkMission,
-  WorkshopAlarm
+  WorkshopAlarm,
+  HomeworkTask,
+  HomeworkTaskStatus
 } from '../types';
 import {
   initialCompanySettings,
@@ -43,6 +45,7 @@ const STORAGE_KEYS = {
   EXPENSES: 'mgommon_worker_expenses_v4',
   MISC_PAYMENTS: 'mgommon_misc_payments_v4',
   WORK_MISSIONS: 'mgommon_work_missions_v4',
+  HOMEWORK_TASKS: 'mgommon_homework_tasks_v4',
   SALARIES: 'mgommon_salaries_v4',
   AUDIT_LOGS: 'mgommon_audit_logs_v4',
   USERS: 'mgommon_users_v4',
@@ -988,7 +991,7 @@ export class StorageService {
 
     // Check GPS and assigned workshop (Fixes GPS-005 & GPS-006)
     let verifiedLocation;
-    if (gpsCoords) {
+    if (gpsCoords && !emp.allowManualAttendance && method !== 'MANUAL') {
       if (!Number.isFinite(gpsCoords.lat) || !Number.isFinite(gpsCoords.lng)) {
         return { success: false, message: 'مختصات موقعیت مکانی نامعتبر است.' };
       }
@@ -1167,7 +1170,7 @@ export class StorageService {
 
     const settings = this.getSettings();
     let verifiedLocation = existing.verifiedLocation;
-    if (gpsCoords) {
+    if (gpsCoords && !emp.allowManualAttendance && method !== 'MANUAL') {
       if (!Number.isFinite(gpsCoords.lat) || !Number.isFinite(gpsCoords.lng)) {
         return { success: false, message: 'مختصات موقعیت مکانی نامعتبر است.' };
       }
@@ -1362,6 +1365,121 @@ export class StorageService {
       return r;
     });
     this.saveAttendance(updated);
+  }
+
+  static updateTodayAttendanceManual(
+    employeeId: string,
+    checkInTime: string,
+    checkOutTime?: string,
+    notes?: string
+  ): { success: boolean; message: string; record?: AttendanceRecord } {
+    const today = getTodayShamsi();
+    const records = this.getAllAttendanceRaw();
+    const existing = records.find(r => r.employeeId === employeeId && r.date === today);
+    const employees = this.getAllEmployeesRaw();
+    const emp = employees.find(e => e.id === employeeId);
+    if (!emp) return { success: false, message: 'پرسنل یافت نشد.' };
+
+    const shifts = this.getShifts();
+    const shift = shifts.find(s => s.id === emp.shiftId) || shifts[0];
+
+    // Calculate late minutes
+    const effectiveStartTime = (emp.customWorkHoursEnabled && emp.workStartTime) || shift.startTime || '07:00';
+    const [startH, startM] = effectiveStartTime.split(':').map(Number);
+    const [inH, inM] = checkInTime.split(':').map(Number);
+    const expectedMinutes = startH * 60 + startM;
+    const actualInMinutes = inH * 60 + inM;
+
+    let lateMinutes = 0;
+    let status: AttendanceRecord['status'] = 'PRESENT';
+    if (actualInMinutes > expectedMinutes + (shift.lateToleranceMinutes || 15)) {
+      lateMinutes = actualInMinutes - expectedMinutes;
+      status = 'LATE';
+    }
+
+    let netWorkedMins = 0;
+    let earlyExitMinutes = 0;
+    let overtimeMinutes = 0;
+
+    if (checkOutTime) {
+      const [outH, outM] = checkOutTime.split(':').map(Number);
+      const outTotalMins = outH * 60 + outM;
+      if (outTotalMins < actualInMinutes) {
+        return {
+          success: false,
+          message: `ساعت خروج (${checkOutTime}) نمی‌تواند قبل از ساعت ورود (${checkInTime}) باشد.`
+        };
+      }
+      const rawWorkedMins = outTotalMins - actualInMinutes;
+      const breakDeduction = (rawWorkedMins >= 240 && shift.breakDurationMinutes) ? shift.breakDurationMinutes : 0;
+      netWorkedMins = Math.max(0, rawWorkedMins - breakDeduction);
+
+      const effectiveEndTime = (emp.customWorkHoursEnabled && emp.workEndTime) || shift.endTime || '16:00';
+      const now = new Date();
+      const isThursday = now.getDay() === 4;
+      const scheduledEndTime = isThursday
+        ? (emp.thursdayEndTime || shift.thursdayEndTime || '13:00')
+        : effectiveEndTime;
+      const [endH, endM] = scheduledEndTime.split(':').map(Number);
+      const scheduledEndMinutes = endH * 60 + endM;
+
+      if (outTotalMins < scheduledEndMinutes - (shift.earlyExitToleranceMinutes || 0)) {
+        earlyExitMinutes = scheduledEndMinutes - outTotalMins;
+        status = 'EARLY_LEAVE';
+      } else if (outTotalMins > scheduledEndMinutes) {
+        overtimeMinutes = outTotalMins - scheduledEndMinutes;
+      }
+    }
+
+    const targetRecord: AttendanceRecord = existing
+      ? {
+          ...existing,
+          checkInTime,
+          checkOutTime: checkOutTime || existing.checkOutTime || '',
+          workDurationMinutes: checkOutTime ? netWorkedMins : existing.workDurationMinutes,
+          lateMinutes,
+          earlyExitMinutes,
+          overtimeMinutes,
+          status,
+          checkInMethod: 'MANUAL',
+          checkOutMethod: checkOutTime ? 'MANUAL' : existing.checkOutMethod,
+          approvalStatus: 'APPROVED',
+          notes: notes ? `${notes} (ثبت/اصلاح دستی پرسنل)` : existing.notes,
+        }
+      : {
+          id: `att_${Date.now()}`,
+          companyId: emp.companyId,
+          employeeId,
+          date: today,
+          checkInTime,
+          checkOutTime: checkOutTime || '',
+          workDurationMinutes: netWorkedMins,
+          lateMinutes,
+          earlyExitMinutes,
+          overtimeMinutes,
+          status,
+          checkInMethod: 'MANUAL',
+          checkOutMethod: checkOutTime ? 'MANUAL' : undefined,
+          approvalStatus: 'APPROVED',
+          notes: notes ? `${notes} (ثبت مستقیم دستی پرسنل)` : 'ثبت دستی پرسنل',
+        };
+
+    const updatedRecords = existing
+      ? records.map(r => r.id === existing.id ? targetRecord : r)
+      : [targetRecord, ...records];
+
+    this.saveAttendance(updatedRecords);
+    this.addAuditLog(
+      'اصلاح/ثبت تردد دستی',
+      'حضور و غیاب',
+      `ثبت تردد دستی ${emp.firstName} ${emp.lastName}: ورود ${checkInTime}${checkOutTime ? ` و خروج ${checkOutTime}` : ''}`
+    );
+
+    return {
+      success: true,
+      message: `ساعات تردد دستی با موفقیت ثبت شد (ورود: ${checkInTime}${checkOutTime ? ` | خروج: ${checkOutTime}` : ''}).`,
+      record: targetRecord,
+    };
   }
 
   // ==========================================================
@@ -2116,6 +2234,189 @@ export class StorageService {
   }
 
   // ==========================================================
+  // HOMEWORK / PIECEWORK TASKS (کار در منزل / کارمزدی و قطعه‌کاری)
+  // ==========================================================
+
+  static getAllHomeworkTasksRaw(): HomeworkTask[] {
+    return getItem<HomeworkTask[]>(STORAGE_KEYS.HOMEWORK_TASKS, []);
+  }
+
+  static saveHomeworkTasks(tasks: HomeworkTask[]): void {
+    setItem(STORAGE_KEYS.HOMEWORK_TASKS, tasks);
+  }
+
+  static getHomeworkTasks(requestingUser?: User): HomeworkTask[] {
+    const all = this.getAllHomeworkTasksRaw();
+    const user = requestingUser || this.getCurrentUser();
+    if (!user) return [];
+
+    if (user.role === 'EMPLOYEE' && user.employeeId) {
+      return all.filter(t => t.employeeId === user.employeeId);
+    }
+    return all;
+  }
+
+  static submitHomeworkTask(data: {
+    employeeId: string;
+    taskType: string;
+    quantity: number;
+    unit?: string;
+    wagePerUnit: number;
+    date?: string;
+    orderOrBatchCode?: string;
+    orderCode?: string;
+    notes?: string;
+    receiptOrProofUrl?: string;
+    proofImageUrl?: string;
+  }): { success: boolean; message: string; task?: HomeworkTask } {
+    if (!data.employeeId || !data.taskType?.trim()) {
+      return { success: false, message: 'لطفاً نام یا نوع کار انجام‌شده را مشخص فرمایید.' };
+    }
+    const qty = Number(data.quantity);
+    const rate = Number(data.wagePerUnit);
+    if (isNaN(qty) || qty <= 0) {
+      return { success: false, message: 'میزان یا تعداد کار باید عددی بزرگتر از صفر باشد.' };
+    }
+    if (isNaN(rate) || rate < 0) {
+      return { success: false, message: 'نرخ دستمزد هر واحد معتبر نیست.' };
+    }
+
+    const employees = this.getAllEmployeesRaw();
+    const emp = employees.find(e => e.id === data.employeeId);
+    const employeeName = emp ? `${emp.firstName} ${emp.lastName}` : 'پرسنل';
+    const settings = this.getSettings();
+    const totalWage = Math.round(qty * rate);
+    const date = data.date || getTodayShamsi();
+    const orderRef = (data.orderCode || data.orderOrBatchCode)?.trim();
+    const proofUrl = data.proofImageUrl || data.receiptOrProofUrl;
+
+    const newTask: HomeworkTask = {
+      id: `hw_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      companyId: settings.id,
+      employeeId: data.employeeId,
+      employeeName,
+      taskType: data.taskType.trim(),
+      quantity: qty,
+      unit: data.unit || 'عدد',
+      wagePerUnit: rate,
+      totalWage,
+      date,
+      orderOrBatchCode: orderRef,
+      orderCode: orderRef,
+      notes: data.notes?.trim(),
+      receiptOrProofUrl: proofUrl,
+      proofImageUrl: proofUrl,
+      status: 'PENDING',
+      createdAt: new Date().toISOString()
+    };
+
+    const current = this.getAllHomeworkTasksRaw();
+    current.unshift(newTask);
+    this.saveHomeworkTasks(current);
+
+    // ارسال اعلان به مدیران در سیستم پیام‌ها
+    const formattedWage = formatCurrencyTomans(totalWage);
+    const messages = this.getMessages();
+    const newMsg: BroadcastMessage = {
+      id: `msg_hw_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      companyId: settings.id,
+      senderName: employeeName,
+      recipientType: 'ALL',
+      title: 'گزارش کار در منزل / کارمزدی',
+      content: `گزارش کار در منزل جدید:\n${employeeName} تعداد ${data.quantity} ${data.unit || 'عدد'} از نوع «${data.taskType}» را ثبت کرد.\nمبلغ دستمزد: ${formattedWage}\nتاریخ: ${date}\nوضعیت: در انتظار بررسی و تسویه مدیر`,
+      channel: 'IN_APP',
+      sentAt: `${getTodayShamsi()} - ${getCurrentTimeStr()}`,
+      status: 'DELIVERED'
+    };
+    messages.unshift(newMsg);
+    this.saveMessages(messages);
+
+    this.addAuditLog(
+      'ثبت کار در منزل / کارمزدی',
+      'کار در منزل',
+      `${employeeName} کارمزدی «${data.taskType}» به تعداد ${data.quantity} ${data.unit || 'عدد'} (مبلغ ${formattedWage}) ثبت نمود.`
+    );
+
+    return {
+      success: true,
+      message: `کار در منزل با موفقیت ثبت شد و به مطالبات در انتظار مدیریت ارسال گردید. (مبلغ دستمزد: ${formattedWage})`,
+      task: newTask
+    };
+  }
+
+  static reviewHomeworkTask(
+    id: string,
+    action: 'SETTLE_NOW' | 'ADD_TO_SALARY' | 'REJECT',
+    reviewerName: string,
+    notes?: string
+  ): { success: boolean; message: string } {
+    const raw = this.getAllHomeworkTasksRaw();
+    const target = raw.find(t => t.id === id);
+    if (!target) return { success: false, message: 'مورد کار در منزل یافت نشد.' };
+
+    const formattedWage = formatCurrencyTomans(target.totalWage);
+    let newStatus: HomeworkTaskStatus = 'SETTLED';
+    let settlementType: 'IMMEDIATE' | 'SALARY' | 'REJECTED' = 'IMMEDIATE';
+    let logAction = '';
+    let successMsg = '';
+
+    if (action === 'SETTLE_NOW') {
+      newStatus = 'SETTLED';
+      settlementType = 'IMMEDIATE';
+      logAction = 'تسویه مستقیم کار در منزل';
+      successMsg = `کار در منزل ${target.employeeName} به مبلغ ${formattedWage} به صورت نقدی/مستقیم تسویه شد.`;
+    } else if (action === 'ADD_TO_SALARY') {
+      newStatus = 'ADDED_TO_SALARY';
+      settlementType = 'SALARY';
+      logAction = 'افزودن دستمزد کار در منزل به فیش حقوقی';
+      successMsg = `دستمزد کار در منزل به مبلغ ${formattedWage} به عنوان کارمزد به فیش حقوقی دوره جاری اضافه شد (پایه حقوق بدون تغییر باقی می‌ماند).`;
+    } else if (action === 'REJECT') {
+      newStatus = 'REJECTED';
+      settlementType = 'REJECTED';
+      logAction = 'رد کار در منزل';
+      successMsg = `گزارش کار در منزل رد شد.`;
+    }
+
+    const updated = raw.map(t => {
+      if (t.id === id) {
+        return {
+          ...t,
+          status: newStatus,
+          settlementType,
+          settledAt: `${getTodayShamsi()} - ${getCurrentTimeStr()}`,
+          settledBy: reviewerName,
+          reviewedBy: reviewerName,
+          settlementNotes: action !== 'REJECT' ? (notes || (action === 'SETTLE_NOW' ? 'تسویه مستقیم نقدی' : 'افزوده‌شده به فیش حقوقی')) : undefined,
+          rejectionReason: action === 'REJECT' ? (notes || 'عدم تایید توسط مدیریت') : undefined
+        };
+      }
+      return t;
+    });
+
+    this.saveHomeworkTasks(updated);
+    this.addAuditLog(
+      logAction,
+      'کار در منزل',
+      `${logAction}: ${target.employeeName} - ${target.taskType} (مبلغ: ${formattedWage})`
+    );
+
+    // در صورت افزودن به حقوق، محاسبه اتوماتیک حقوق دوره جاری بروزرسانی شود
+    if (action === 'ADD_TO_SALARY') {
+      const month = target.date ? target.date.substring(0, 7) : getTodayShamsi().substring(0, 7);
+      this.calculateSalaryForEmployee(target.employeeId, month);
+    }
+
+    return { success: true, message: successMsg };
+  }
+
+  static deleteHomeworkTask(id: string): { success: boolean; message: string } {
+    const raw = this.getAllHomeworkTasksRaw();
+    const filtered = raw.filter(t => t.id !== id);
+    this.saveHomeworkTasks(filtered);
+    return { success: true, message: 'مورد کار در منزل حذف شد.' };
+  }
+
+  // ==========================================================
   // PAYROLL & SALARIES (Fixes PAY-001..PAY-006)
   // ==========================================================
 
@@ -2229,6 +2530,11 @@ export class StorageService {
       .filter(e => e.employeeId === employeeId && e.status === 'ADDED_TO_SALARY' && (e.date?.startsWith(month) || e.date?.replace(/-/g, '/').startsWith(normMonth)))
       .reduce((sum, e) => sum + e.amount, 0);
 
+    // دستمزد کار در منزل و کارمزدی تایید شده که گزینه «افزودن به حقوق دوره جاری» انتخاب شده است (بدون اثر بر پایه حقوق)
+    const approvedHomeworkWagesToSalary = this.getAllHomeworkTasksRaw()
+      .filter(h => h.employeeId === employeeId && h.status === 'ADDED_TO_SALARY' && (h.date?.startsWith(month) || h.date?.replace(/-/g, '/').startsWith(normMonth)))
+      .reduce((sum, h) => sum + h.totalWage, 0);
+
     // پرداخت‌های متفرقه و علی‌الحساب که گزینه «از حقوق کسر شود» انتخاب شده است
     const miscDeductions = this.getAllMiscPaymentsRaw()
       .filter(m => m.employeeId === employeeId && m.deductFromSalary && (m.month?.replace(/-/g, '/') === normMonth || m.date?.replace(/-/g, '/').startsWith(normMonth)))
@@ -2238,7 +2544,7 @@ export class StorageService {
     const grocery = Number(settings.fixedGroceryAllowance) > 0 ? Number(settings.fixedGroceryAllowance) : 0;
     const child = Number(settings.childAllowance) > 0 ? Number(settings.childAllowance) : 0;
 
-    const grossSalary = emp.baseSalary + overtimeAmount + bonuses + housing + grocery + child;
+    const grossSalary = emp.baseSalary + overtimeAmount + bonuses + housing + grocery + child + approvedHomeworkWagesToSalary;
     const insuranceBase = emp.baseSalary + housing + grocery;
     const insuranceDeduction = Math.round(insuranceBase * ((settings.insuranceRatePercent || 7) / 100));
     const taxableBase = Math.max(0, grossSalary - (settings.taxExemptionThreshold || 14000000));
@@ -2263,6 +2569,7 @@ export class StorageService {
       advancesTotal: totalAdvances,
       discretionaryAdvancesTotal: discretionaryAdvances,
       personalCardExpensesTotal: approvedExpensesToSalary,
+      homeworkWagesTotal: approvedHomeworkWagesToSalary,
       miscDeductionsTotal: miscDeductions,
       housingAllowance: housing,
       groceryAllowance: grocery,

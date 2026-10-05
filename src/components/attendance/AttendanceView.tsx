@@ -65,7 +65,8 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     const settings = StorageService.getSettings();
     const assignedWs = settings.workshops?.find(w => w.id === currentEmp.workshopId) || settings.workshops?.[0];
     const coords = assignedWs ? { lat: assignedWs.lat, lng: assignedWs.lng } : { lat: 36.37652, lng: 59.50812 };
-    const res = StorageService.clockIn(currentEmp.id, 'GPS', coords);
+    const method = currentEmp.allowManualAttendance ? 'MANUAL' : 'GPS';
+    const res = StorageService.clockIn(currentEmp.id, method, currentEmp.allowManualAttendance ? undefined : coords);
     setPersonalActionMsg({ success: res.success, text: res.message });
     onRefresh();
     setTimeout(() => setPersonalActionMsg(null), 5000);
@@ -76,7 +77,8 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     const settings = StorageService.getSettings();
     const assignedWs = settings.workshops?.find(w => w.id === currentEmp.workshopId) || settings.workshops?.[0];
     const coords = assignedWs ? { lat: assignedWs.lat, lng: assignedWs.lng } : { lat: 36.37652, lng: 59.50812 };
-    const res = StorageService.clockOut(currentEmp.id, 'GPS', coords);
+    const method = currentEmp.allowManualAttendance ? 'MANUAL' : 'GPS';
+    const res = StorageService.clockOut(currentEmp.id, method, currentEmp.allowManualAttendance ? undefined : coords);
     setPersonalActionMsg({ success: res.success, text: res.message });
     onRefresh();
     setTimeout(() => setPersonalActionMsg(null), 5000);
@@ -235,6 +237,13 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
         </span>
       );
     }
+    if (method === 'MANUAL') {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
+          <CheckCircle2 className="w-3 h-3 text-teal-600" /> ثبت دستی مستقیم
+        </span>
+      );
+    }
     return (
       <span className="text-[11px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
         ثبت دستی
@@ -372,14 +381,21 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
             </div>
 
             <div className="flex items-center justify-end gap-2 flex-wrap">
-              <button
-                type="button"
-                onClick={() => setIsScannerModalOpen(true)}
-                className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer"
-              >
-                <Camera className="w-4 h-4 text-emerald-300" />
-                <span>اسکن تابلو کارگاه (دوربین و GPS)</span>
-              </button>
+              {currentEmp?.allowManualAttendance ? (
+                <div className="px-3.5 py-2.5 rounded-2xl bg-emerald-500/20 text-emerald-200 text-xs font-bold border border-emerald-400/30 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>ثبت تردد دستی بدون نیاز به QR فعال است</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsScannerModalOpen(true)}
+                  className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer"
+                >
+                  <Camera className="w-4 h-4 text-emerald-300" />
+                  <span>اسکن تابلو کارگاه (دوربین و GPS)</span>
+                </button>
+              )}
 
               {!todayRecord ? (
                 <button
@@ -388,7 +404,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                   className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg hover:shadow-emerald-500/25 transition-all cursor-pointer"
                 >
                   <LogIn className="w-4 h-4" />
-                  <span>ثبت ورود فوری</span>
+                  <span>{currentEmp?.allowManualAttendance ? 'ثبت ورود دستی' : 'ثبت ورود فوری'}</span>
                 </button>
               ) : !todayRecord.checkOutTime ? (
                 <button
@@ -397,7 +413,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                   className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg hover:shadow-rose-500/25 transition-all cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
-                  <span>ثبت خروج و محاسبه اضافه‌کار</span>
+                  <span>{currentEmp?.allowManualAttendance ? 'ثبت خروج دستی' : 'ثبت خروج و محاسبه اضافه‌کار'}</span>
                 </button>
               ) : (
                 <div className="px-4 py-2.5 rounded-2xl bg-white/10 text-emerald-300 text-xs font-semibold border border-emerald-500/30">

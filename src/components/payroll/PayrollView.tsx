@@ -808,6 +808,14 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
                         </span>
                       </div>
                     ) : null}
+                    {viewingPayslip.homeworkWagesTotal && viewingPayslip.homeworkWagesTotal > 0 ? (
+                      <div className="flex justify-between py-1 border-b border-slate-100 text-indigo-700 font-bold bg-purple-50/70 px-1.5 py-1 rounded-lg">
+                        <span>دستمزد کار در منزل و کارمزدی:</span>
+                        <span className="font-mono">
+                          +{formatCurrencyTomans(viewingPayslip.homeworkWagesTotal)}
+                        </span>
+                      </div>
+                    ) : null}
                     <div className="flex justify-between pt-2 font-bold text-slate-900">
                       <span>جمع ناخالص پرداختی:</span>
                       <span className="font-mono">

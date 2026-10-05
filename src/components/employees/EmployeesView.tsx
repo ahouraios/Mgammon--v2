@@ -30,7 +30,11 @@ import {
   Copy,
   Check,
   Key,
-  Sparkles
+  Sparkles,
+  Home,
+  CheckCircle2,
+  Fingerprint,
+  UserCheck
 } from 'lucide-react';
 import { Employee, Shift, User as AppUser, PERMISSION_LEVELS, MANAGEMENT_ROLES, ManagementRole } from '../../types';
 import {
@@ -177,14 +181,21 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     workStartTime: settings.defaultWorkStartTime || '07:00',
     workEndTime: settings.defaultWorkEndTime || '16:00',
     thursdayEndTime: '13:00',
+    isHomeworkWorker: false,
+    homeworkWagePerUnit: 0,
+    homeworkDefaultTaskType: 'مونتاژ و پرداخت قطعات',
+    allowManualAttendance: false,
   };
 
   const [formData, setFormData] = useState<Omit<Employee, 'id' | 'companyId'>>(defaultFormData);
+  const [featureFilter, setFeatureFilter] = useState<'ALL' | 'HOMEWORK' | 'MANUAL_ATTENDANCE'>('ALL');
 
   const departments = ['ALL', ...Array.from(new Set([...categories, ...employees.map((e) => e.department)]))];
 
   // Count confidential employees for Super Admin
   const confidentialCount = employees.filter(e => e.isConfidential).length;
+  const homeworkCount = employees.filter(e => e.isHomeworkWorker && (!isManagerOnly || !e.isConfidential)).length;
+  const manualAttendanceCount = employees.filter(e => e.allowManualAttendance && (!isManagerOnly || !e.isConfidential)).length;
 
   const filteredEmployees = employees.filter((emp) => {
     // If Manager (HR), confidential employees are strictly hidden!
@@ -198,7 +209,11 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
       emp.position.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDept = selectedDepartment === 'ALL' || emp.department === selectedDepartment;
     const matchesStatus = selectedStatus === 'ALL' || emp.status === selectedStatus;
-    return matchesSearch && matchesDept && matchesStatus;
+    const matchesFeature =
+      featureFilter === 'ALL' ||
+      (featureFilter === 'HOMEWORK' && emp.isHomeworkWorker) ||
+      (featureFilter === 'MANUAL_ATTENDANCE' && emp.allowManualAttendance);
+    return matchesSearch && matchesDept && matchesStatus && matchesFeature;
   });
 
   const handleOpenAddModal = () => {
@@ -227,6 +242,10 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
       workStartTime: settings.defaultWorkStartTime || '07:00',
       workEndTime: settings.defaultWorkEndTime || '16:00',
       thursdayEndTime: '13:00',
+      isHomeworkWorker: false,
+      homeworkWagePerUnit: 0,
+      homeworkDefaultTaskType: 'مونتاژ و پرداخت قطعات',
+      allowManualAttendance: false,
     });
     setIsFormModalOpen(true);
   };
@@ -269,6 +288,10 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
       workStartTime: emp.workStartTime || settings.defaultWorkStartTime || '07:00',
       workEndTime: emp.workEndTime || settings.defaultWorkEndTime || '16:00',
       thursdayEndTime: emp.thursdayEndTime || '13:00',
+      isHomeworkWorker: Boolean(emp.isHomeworkWorker),
+      homeworkWagePerUnit: emp.homeworkWagePerUnit || 0,
+      homeworkDefaultTaskType: emp.homeworkDefaultTaskType || 'مونتاژ و پرداخت قطعات',
+      allowManualAttendance: Boolean(emp.allowManualAttendance),
     });
     setIsFormModalOpen(true);
   };
@@ -276,6 +299,36 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
   // Toggle Confidential Status (Admin Only)
   const handleToggleConfidential = (empId: string) => {
     StorageService.toggleConfidential(empId);
+    onRefresh();
+  };
+
+  // Toggle Homework / Piecework Capability (Admin or HR Manager)
+  const handleToggleHomeworkWorker = (empId: string) => {
+    const list = StorageService.getAllEmployeesRaw().map((e) =>
+      e.id === empId ? { ...e, isHomeworkWorker: !e.isHomeworkWorker } : e
+    );
+    StorageService.saveEmployees(list);
+    const target = list.find((e) => e.id === empId);
+    StorageService.addAuditLog(
+      'تغییر وضعیت کار در منزل',
+      'پرسنل',
+      `دسترسی کار در منزل برای ${target?.firstName} ${target?.lastName} به ${target?.isHomeworkWorker ? 'فعال' : 'غیرفعال'} تغییر یافت.`
+    );
+    onRefresh();
+  };
+
+  // Toggle Manual Attendance Capability (Admin or HR Manager)
+  const handleToggleManualAttendance = (empId: string) => {
+    const list = StorageService.getAllEmployeesRaw().map((e) =>
+      e.id === empId ? { ...e, allowManualAttendance: !e.allowManualAttendance } : e
+    );
+    StorageService.saveEmployees(list);
+    const target = list.find((e) => e.id === empId);
+    StorageService.addAuditLog(
+      'تغییر دسترسی تردد دستی',
+      'پرسنل',
+      `دسترسی ثبت تردد دستی بدون QR برای ${target?.firstName} ${target?.lastName} به ${target?.allowManualAttendance ? 'فعال' : 'غیرفعال'} تغییر یافت.`
+    );
     onRefresh();
   };
 
@@ -578,44 +631,86 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
       )}
 
       {/* Filter and Search Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
-          <input
-            type="text"
-            placeholder="جستجوی نام، کد پرسنلی یا سمت..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-3 pr-9 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-slate-50/50"
-          />
-        </div>
-        <div className="flex items-center gap-2.5 w-full sm:w-auto">
-          {/* Department Filter */}
-          <div className="flex items-center gap-1.5 text-xs text-slate-500">
-            <Filter className="w-3.5 h-3.5" />
+      <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+          <div className="relative w-full sm:w-80">
+            <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
+            <input
+              type="text"
+              placeholder="جستجوی نام، کد پرسنلی یا سمت..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-3 pr-9 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 bg-slate-50/50"
+            />
+          </div>
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+            {/* Department Filter */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <Filter className="w-3.5 h-3.5" />
+              <select
+                value={selectedDepartment}
+                onChange={(e) => setSelectedDepartment(e.target.value)}
+                className="text-xs rounded-lg border border-slate-200 py-1.5 px-2 bg-white text-slate-700 focus:outline-none"
+              >
+                {departments.map((d) => (
+                  <option key={d} value={d}>
+                    {d === 'ALL' ? 'تمامی واحدها' : d}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {/* Status Filter */}
             <select
-              value={selectedDepartment}
-              onChange={(e) => setSelectedDepartment(e.target.value)}
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
               className="text-xs rounded-lg border border-slate-200 py-1.5 px-2 bg-white text-slate-700 focus:outline-none"
             >
-              {departments.map((d) => (
-                <option key={d} value={d}>
-                  {d === 'ALL' ? 'تمامی واحدها' : d}
-                </option>
-              ))}
+              <option value="ALL">همه وضعیت‌ها</option>
+              <option value="ACTIVE">فقط فعال</option>
+              <option value="INACTIVE">غیرفعال</option>
+              <option value="ON_LEAVE">در مرخصی</option>
             </select>
           </div>
-          {/* Status Filter */}
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="text-xs rounded-lg border border-slate-200 py-1.5 px-2 bg-white text-slate-700 focus:outline-none"
+        </div>
+
+        {/* Feature quick filters */}
+        <div className="flex items-center gap-2 pt-2 border-t border-slate-100 flex-wrap text-xs">
+          <span className="text-[11px] font-semibold text-slate-400">فیلتر امکانات:</span>
+          <button
+            type="button"
+            onClick={() => setFeatureFilter('ALL')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              featureFilter === 'ALL'
+                ? 'bg-slate-800 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
           >
-            <option value="ALL">همه وضعیت‌ها</option>
-            <option value="ACTIVE">فقط فعال</option>
-            <option value="INACTIVE">غیرفعال</option>
-            <option value="ON_LEAVE">در مرخصی</option>
-          </select>
+            همه پرسنل ({employees.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFeatureFilter('HOMEWORK')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+              featureFilter === 'HOMEWORK'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
+            }`}
+          >
+            <Home className="w-3 h-3" />
+            <span>کار در منزل ({homeworkCount})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFeatureFilter('MANUAL_ATTENDANCE')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+              featureFilter === 'MANUAL_ATTENDANCE'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+            }`}
+          >
+            <CheckCircle2 className="w-3 h-3" />
+            <span>ثبت تردد دستی بدون QR ({manualAttendanceCount})</span>
+          </button>
         </div>
       </div>
 
@@ -652,6 +747,16 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                           {emp.isConfidential && isSuperAdmin && (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-0.5">
                               <Lock className="w-2.5 h-2.5" /> اختصاصی مدیر
+                            </span>
+                          )}
+                          {emp.isHomeworkWorker && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-900 border border-indigo-200 flex items-center gap-0.5">
+                              <Home className="w-2.5 h-2.5 text-indigo-600" /> کار در منزل
+                            </span>
+                          )}
+                          {emp.allowManualAttendance && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-200 flex items-center gap-0.5">
+                              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" /> تردد دستی (بدون QR)
                             </span>
                           )}
                         </div>
@@ -748,6 +853,30 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                         )}
                         <button
                           type="button"
+                          onClick={() => handleToggleHomeworkWorker(emp.id)}
+                          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                            emp.isHomeworkWorker
+                              ? 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200'
+                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                          }`}
+                          title={emp.isHomeworkWorker ? 'غیرفعال‌سازی دسترسی کار در منزل' : 'فعال‌سازی دسترسی کار در منزل برای این پرسنل'}
+                        >
+                          <Home className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleManualAttendance(emp.id)}
+                          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                            emp.allowManualAttendance
+                              ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                          }`}
+                          title={emp.allowManualAttendance ? 'غیرفعال‌سازی ثبت تردد دستی (بازگشت به اسکن QR)' : 'فعال‌سازی ثبت تردد دستی بدون QR برای این پرسنل'}
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleOpenPermissionsModal(emp)}
                           className="p-1.5 rounded-lg text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors cursor-pointer"
                           title="تنظیم سطوح دسترسی (۱ تا ۱۰)"
@@ -842,6 +971,16 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                                   <Lock className="w-2.5 h-2.5" /> اختصاصی مدیر
                                 </span>
                               )}
+                              {emp.isHomeworkWorker && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-900 border border-indigo-200 flex items-center gap-0.5">
+                                  <Home className="w-2.5 h-2.5 text-indigo-600" /> کار در منزل
+                                </span>
+                              )}
+                              {emp.allowManualAttendance && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-200 flex items-center gap-0.5">
+                                  <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" /> تردد دستی
+                                </span>
+                              )}
                             </div>
                             <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
                               <Phone className="w-3 h-3 text-slate-400" />
@@ -910,6 +1049,30 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                               <Sliders className="w-4 h-4" />
                             </button>
                           )}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleHomeworkWorker(emp.id)}
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                              emp.isHomeworkWorker
+                                ? 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200'
+                                : 'text-slate-400 hover:text-indigo-700 hover:bg-indigo-50'
+                            }`}
+                            title={emp.isHomeworkWorker ? 'غیرفعال‌سازی دسترسی کار در منزل' : 'فعال‌سازی دسترسی کار در منزل برای این پرسنل'}
+                          >
+                            <Home className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleManualAttendance(emp.id)}
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                              emp.allowManualAttendance
+                                ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                                : 'text-slate-400 hover:text-emerald-700 hover:bg-emerald-50'
+                            }`}
+                            title={emp.allowManualAttendance ? 'غیرفعال‌سازی ثبت تردد دستی (بازگشت به اسکن QR)' : 'فعال‌سازی ثبت تردد دستی بدون QR برای این پرسنل'}
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => setViewingProfile(emp)}
                             className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
@@ -1087,6 +1250,33 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {viewingProfile.isHomeworkWorker && (
+                  <div className="mt-3 pt-3 border-t border-indigo-100 bg-indigo-50/70 -mx-4 -mb-4 p-3 rounded-b-xl text-xs space-y-1">
+                    <div className="font-bold text-indigo-950 flex items-center gap-1.5">
+                      <Home className="w-4 h-4 text-indigo-600" />
+                      <span>دسترسی فعال کار در منزل / کارمزدی</span>
+                    </div>
+                    <div className="text-[11px] text-indigo-900 flex items-center justify-between pt-1 flex-wrap gap-2">
+                      <span>نوع کار پیش‌فرض: <strong>{viewingProfile.homeworkDefaultTaskType || 'کارهای کارگاهی'}</strong></span>
+                      {viewingProfile.homeworkWagePerUnit && viewingProfile.homeworkWagePerUnit > 0 ? (
+                        <span>نرخ پایه: <strong className="font-mono">{formatCurrencyTomans(viewingProfile.homeworkWagePerUnit)}</strong> هر واحد</span>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
+
+                {viewingProfile.allowManualAttendance && (
+                  <div className="mt-3 pt-3 border-t border-emerald-100 bg-emerald-50/70 -mx-4 -mb-4 p-3 rounded-b-xl text-xs space-y-1">
+                    <div className="font-bold text-emerald-950 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>ثبت تردد صرفاً به‌صورت دستی فعال است (بدون نیاز به اسکن QR)</span>
+                    </div>
+                    <p className="text-[11px] text-emerald-800 leading-relaxed">
+                      این پرسنل مجاز به ثبت ورود و خروج مستقیم دستی در پنل خود بدون اسکن دوربین کارگاه می‌باشد.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
@@ -1764,6 +1954,104 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* HOMEWORK / PIECEWORK CAPABILITY (کار در منزل و کارمزدی) */}
+              <div className="p-4 bg-gradient-to-br from-indigo-50/90 to-purple-50/70 border border-indigo-200/90 rounded-2xl space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2.5">
+                    <input
+                      type="checkbox"
+                      id="isHomeworkWorkerCheck"
+                      checked={Boolean(formData.isHomeworkWorker)}
+                      onChange={(e) => setFormData({ ...formData, isHomeworkWorker: e.target.checked })}
+                      className="mt-1 w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    />
+                    <label htmlFor="isHomeworkWorkerCheck" className="text-xs text-indigo-950 font-bold cursor-pointer">
+                      <span className="flex items-center gap-1.5">
+                        <Home className="w-4 h-4 text-indigo-600" />
+                        <span>مجاز به انجام کار در منزل / کارمزدی و قطعه‌کاری</span>
+                      </span>
+                      <span className="block text-[11px] font-normal text-indigo-800/90 mt-0.5 leading-relaxed">
+                        با فعال‌سازی این قابلیت، پرسنل در پنل و پرتال شخصی خود به بخش ثبت کار در منزل دسترسی پیدا کرده و می‌تواند میزان و نوع کارهای انجام‌شده را جهت بررسی و تسویه برای مدیریت ارسال کند.
+                      </span>
+                    </label>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 border ${
+                    formData.isHomeworkWorker ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-500 border-slate-200'
+                  }`}>
+                    {formData.isHomeworkWorker ? 'فعال' : 'غیرفعال'}
+                  </span>
+                </div>
+
+                {formData.isHomeworkWorker && (
+                  <div className="pt-2 border-t border-indigo-200/70 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in fade-in">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        نوع یا شرح کار پیش‌فرض در منزل:
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.homeworkDefaultTaskType || ''}
+                        onChange={(e) => setFormData({ ...formData, homeworkDefaultTaskType: e.target.value })}
+                        placeholder="مثال: مونتاژ قطعات، سنباده‌زنی، دوخت، بسته‌بندی"
+                        className="w-full text-xs p-2 rounded-xl border border-indigo-200 bg-white focus:outline-none focus:border-indigo-600"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        نرخ پایه دستمزد هر واحد / قطعه (تومان - اختیاری):
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={formData.homeworkWagePerUnit ? formData.homeworkWagePerUnit.toLocaleString('en-US') : ''}
+                        onChange={(e) => {
+                          const raw = toEnglishDigits(e.target.value).replace(/\D/g, '');
+                          setFormData({ ...formData, homeworkWagePerUnit: raw ? Number(raw) : 0 });
+                        }}
+                        placeholder="مثال: ۲۵,۰۰۰ تومان به ازای هر قطعه"
+                        className="w-full text-xs p-2 rounded-xl border border-indigo-200 bg-white font-mono text-left focus:outline-none focus:border-indigo-600 font-bold"
+                        dir="ltr"
+                      />
+                      {formData.homeworkWagePerUnit && formData.homeworkWagePerUnit > 0 ? (
+                        <span className="text-[10px] text-indigo-700 mt-1 block">
+                          معادل: {formatCurrencyTomans(formData.homeworkWagePerUnit)} به ازای هر واحد
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ALLOW MANUAL ATTENDANCE (ثبت تردد دستی بدون نیاز به QR) */}
+              <div className="p-4 bg-gradient-to-br from-emerald-50/90 to-teal-50/70 border border-emerald-200/90 rounded-2xl space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2.5">
+                    <input
+                      type="checkbox"
+                      id="allowManualAttendanceCheck"
+                      checked={Boolean(formData.allowManualAttendance)}
+                      onChange={(e) => setFormData({ ...formData, allowManualAttendance: e.target.checked })}
+                      className="mt-1 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <label htmlFor="allowManualAttendanceCheck" className="text-xs text-emerald-950 font-bold cursor-pointer">
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span>قابلیت فقط ثبت به‌صورت دستی (بدون نیاز به اسکن QR Code)</span>
+                      </span>
+                      <span className="block text-[11px] font-normal text-emerald-800/90 mt-0.5 leading-relaxed">
+                        دقیقاً مشابه قابلیت کار در منزل، مدیر در هر زمان می‌تواند این قابلیت را برای هر پرسنل فعال یا غیرفعال کند. در صورت فعال بودن، پرسنل نیازی به اسکن کیوآرکد کارگاه ندارد و می‌تواند تردد (ورود و خروج) خود را مستقیماً به‌صورت دستی در پنل خود ثبت نماید.
+                      </span>
+                    </label>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 border ${
+                    formData.allowManualAttendance ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-500 border-slate-200'
+                  }`}>
+                    {formData.allowManualAttendance ? 'فعال' : 'غیرفعال'}
+                  </span>
+                </div>
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
