@@ -1,6 +1,25 @@
 <!doctype html>
 <html lang="fa" dir="rtl">
   <head>
+    <script>
+      // AI Studio preview environment runs behind proxy without HMR WebSocket.
+      // Ignore WebSocket connection errors as specified by environment guidelines.
+      window.addEventListener('error', function(e) {
+        if (e && e.message && (e.message.indexOf('WebSocket') !== -1 || e.message.indexOf('vite') !== -1)) {
+          e.preventDefault && e.preventDefault();
+          e.stopImmediatePropagation && e.stopImmediatePropagation();
+          return true;
+        }
+      }, true);
+      window.addEventListener('unhandledrejection', function(e) {
+        var msg = (e && e.reason && (e.reason.message || String(e.reason))) || '';
+        if (msg.indexOf('WebSocket') !== -1 || msg.indexOf('vite') !== -1) {
+          e.preventDefault && e.preventDefault();
+          e.stopImmediatePropagation && e.stopImmediatePropagation();
+          return true;
+        }
+      }, true);
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>M.GAMMON</title>
