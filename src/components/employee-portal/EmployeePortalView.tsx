@@ -56,6 +56,7 @@ import {
 import { CopyButton } from '../common/CopyButton';
 import { StorageService } from '../../services/storage';
 import { playAlarmSound, stopAlarmSound } from '../../utils/soundAlerts';
+import { PWAAlarmService } from '../../utils/pwaAlarmService';
 import {
   formatCurrencyTomans,
   formatNumberFa,
@@ -67,6 +68,7 @@ import {
 import { NavTab } from '../common/Sidebar';
 import { CameraQrScannerModal } from '../attendance/CameraQrScannerModal';
 import { DeveloperBadge } from '../common/DeveloperBadge';
+import { PWAInstallButton } from '../common/PWAInstallButton';
 
 interface EmployeePortalViewProps {
   currentUser: User;
@@ -184,13 +186,30 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
   // Active Workshop Alarm State for Employee
   const [activeAlarm, setActiveAlarm] = useState<WorkshopAlarm | null>(null);
   const [dismissedAlarmIds, setDismissedAlarmIds] = useState<string[]>([]);
+  const [notificationPermission, setNotificationPermission] = useState<string>(
+    PWAAlarmService.getPermissionState()
+  );
+  const [isEnablingBackgroundAlarm, setIsEnablingBackgroundAlarm] = useState(false);
 
   useEffect(() => {
     if (!currentEmployee) return;
 
+    // Listen for background alarm messages from Service Worker when phone wakes up
+    const cleanupMsg = PWAAlarmService.initMessageListener((alarmId) => {
+      StorageService.fetchAlarmsAsync(currentEmployee.id, currentEmployee.workshopId).then((alarms) => {
+        const found = alarms.find((a) => a.id === alarmId);
+        if (found) {
+          setActiveAlarm(found);
+        }
+      });
+    });
+
     const checkActiveAlarms = async () => {
       try {
         const alarms = await StorageService.fetchAlarmsAsync(currentEmployee.id, currentEmployee.workshopId);
+        // Sync upcoming scheduled alarms with Service Worker so it rings on time
+        PWAAlarmService.syncAlarms(alarms);
+
         const pending = alarms.find((a) => {
           if (!a.isActive) return false;
           if (dismissedAlarmIds.includes(a.id)) return false;
@@ -208,8 +227,26 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
 
     checkActiveAlarms();
     const timer = setInterval(checkActiveAlarms, 4000);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      cleanupMsg();
+    };
   }, [currentEmployee?.id, currentEmployee?.workshopId, dismissedAlarmIds, activeAlarm]);
+
+  const handleEnableBackgroundAlarm = async () => {
+    setIsEnablingBackgroundAlarm(true);
+    try {
+      const granted = await PWAAlarmService.requestPermission(currentEmployee?.id);
+      setNotificationPermission(granted ? 'granted' : 'denied');
+      if (granted) {
+        const alarms = await StorageService.fetchAlarmsAsync(currentEmployee?.id, currentEmployee?.workshopId);
+        PWAAlarmService.syncAlarms(alarms);
+        await PWAAlarmService.triggerTestNotification(currentEmployee?.id);
+      }
+    } finally {
+      setIsEnablingBackgroundAlarm(false);
+    }
+  };
 
   const handleDismissAlarm = async () => {
     stopAlarmSound();
@@ -709,8 +746,10 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
             </div>
           </div>
 
-          {/* Left: Logout Button + Notification Bell */}
+          {/* Left: Install Button + Logout Button + Notification Bell */}
           <div className="flex items-center gap-2">
+            <PWAInstallButton variant="compact" className="bg-white/10 hover:bg-white/20 text-white border-white/20" />
+
             {onLogout && (
               <button
                 type="button"
@@ -794,6 +833,44 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
             {shamsi.dayOfWeek} {shamsi.day} {shamsi.monthName} {shamsi.year}
           </p>
         </div>
+
+        {/* Background Alarm & Sound PWA notification status */}
+        {notificationPermission !== 'granted' ? (
+          <div className="bg-gradient-to-r from-indigo-50/90 via-purple-50/90 to-indigo-50/90 border border-indigo-200/90 rounded-2xl p-3 flex items-center justify-between gap-3 text-xs shadow-2xs">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Bell className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="font-bold text-indigo-950 block">فعال‌سازی زنگ در پس‌زمینه (صفحه قفل گوشی)</span>
+                <span className="text-[11px] text-indigo-800/80">جهت نواخته‌شدن آلارم کارگاه حتی در صورت قفل یا بسته بودن برنامه</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleEnableBackgroundAlarm}
+              disabled={isEnablingBackgroundAlarm}
+              className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shrink-0 cursor-pointer shadow-xs transition-colors flex items-center gap-1"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-300" />
+              <span>{isEnablingBackgroundAlarm ? 'در حال فعال‌سازی...' : 'فعال‌سازی زنگ'}</span>
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between px-3 py-2 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-xs text-emerald-900">
+            <span className="flex items-center gap-1.5 font-bold">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>زنگ و آلارم در پس‌زمینه فعال است (هنگام بسته بودن برنامه هم زنگ می‌زند)</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => PWAAlarmService.triggerTestNotification(currentEmployee?.id)}
+              className="text-[11px] font-bold text-emerald-800 underline hover:text-emerald-950 cursor-pointer"
+            >
+              تست صدا و ویبره
+            </button>
+          </div>
+        )}
 
         {/* Shift & Attendance Status Card (Mint Green Card in Image 3) */}
         <div className="bg-[#F0FDF4] border border-emerald-200 rounded-3xl p-5 space-y-4 shadow-2xs">

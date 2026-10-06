@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import webpush from 'web-push';
 import { gregorianToJalali, getDatesBetweenShamsi } from './src/utils/dateUtils';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -29,6 +30,70 @@ if (!fs.existsSync(BANNERS_DIR)) {
 
 // Serve public uploads statically
 app.use('/uploads', express.static(UPLOADS_DIR));
+
+// Ensure VAPID keys for PWA Push Notifications
+const VAPID_FILE = path.join(DATA_DIR, 'vapid.json');
+let vapidKeys = { publicKey: '', privateKey: '' };
+if (fs.existsSync(VAPID_FILE)) {
+  try {
+    vapidKeys = JSON.parse(fs.readFileSync(VAPID_FILE, 'utf-8'));
+  } catch {}
+}
+if (!vapidKeys.publicKey || !vapidKeys.privateKey) {
+  vapidKeys = webpush.generateVAPIDKeys();
+  fs.writeFileSync(VAPID_FILE, JSON.stringify(vapidKeys, null, 2));
+}
+
+try {
+  webpush.setVapidDetails(
+    'mailto:admin@mgammon.local',
+    vapidKeys.publicKey,
+    vapidKeys.privateKey
+  );
+} catch (err) {
+  console.warn('VAPID setup notice:', err);
+}
+
+// Function to broadcast Web Push notification to registered phones
+export async function broadcastPushAlarm(alarm: any) {
+  if (!db || !Array.isArray(db.pushSubscriptions) || db.pushSubscriptions.length === 0) return;
+
+  const payload = JSON.stringify({
+    title: `🔔 ${alarm.title || 'زنگ کارگاه M.GAMMON'}`,
+    message: alarm.message || 'زمان مقرر کارگاه فرا رسید.',
+    alarmId: alarm.id,
+    ringtone: alarm.ringtone || 'BELL',
+    url: `/?activeAlarmId=${alarm.id}&ringtone=${alarm.ringtone || 'BELL'}`
+  });
+
+  const staleEndpoints: string[] = [];
+
+  for (const subItem of db.pushSubscriptions) {
+    if (!subItem.subscription || !subItem.subscription.endpoint) continue;
+
+    // Check targeting if needed
+    if (alarm.targetType === 'CUSTOM' && Array.isArray(alarm.targetEmployeeIds)) {
+      if (subItem.employeeId && !alarm.targetEmployeeIds.includes(subItem.employeeId)) {
+        continue;
+      }
+    }
+
+    try {
+      await webpush.sendNotification(subItem.subscription, payload);
+    } catch (err: any) {
+      if (err.statusCode === 410 || err.statusCode === 404) {
+        staleEndpoints.push(subItem.subscription.endpoint);
+      }
+    }
+  }
+
+  if (staleEndpoints.length > 0) {
+    db.pushSubscriptions = db.pushSubscriptions.filter(
+      (s: any) => !staleEndpoints.includes(s.subscription?.endpoint)
+    );
+    persistDb();
+  }
+}
 
 // Security: Password hashing with PBKDF2 (SHA-256, 100,000 iterations & per-user random salt)
 export function hashPasswordWithSalt(password: string, salt?: string): { hash: string; salt: string } {
@@ -113,6 +178,7 @@ interface DatabaseSchema {
   auditLogs: any[];
   messages: any[];
   alarms?: any[];
+  pushSubscriptions?: any[];
   sessions: { [token: string]: { userId: string; createdAt: number; expiresAt: number; rememberMe?: boolean } };
   webauthnCredentials?: { [userId: string]: any[] };
   webauthnChallenges?: { [challenge: string]: { userId?: string; expiresAt: number } };
@@ -3261,6 +3327,29 @@ app.post('/api/messages', requireRole('ADMIN', 'MANAGER'), async (req: Request, 
 // WORKSHOP ALARM & CHIME SYSTEM (زنگ و آلارم کارگاه)
 // ============================================================================
 
+// Web Push Registration Endpoints (PWA Background Notifications)
+app.get('/api/push/public-key', (req: Request, res: Response) => {
+  res.json({ publicKey: vapidKeys.publicKey });
+});
+
+app.post('/api/push/subscribe', (req: Request, res: Response) => {
+  const { subscription, employeeId } = req.body;
+  if (!subscription || !subscription.endpoint) {
+    return res.status(400).json({ success: false, message: 'اطلاعات اشتراک نامعتبر است' });
+  }
+
+  db.pushSubscriptions = db.pushSubscriptions || [];
+  const existingIdx = db.pushSubscriptions.findIndex((s: any) => s.subscription?.endpoint === subscription.endpoint);
+  if (existingIdx >= 0) {
+    db.pushSubscriptions[existingIdx] = { subscription, employeeId, updatedAt: new Date().toISOString() };
+  } else {
+    db.pushSubscriptions.push({ subscription, employeeId, createdAt: new Date().toISOString() });
+  }
+
+  persistDb();
+  res.json({ success: true, message: 'دستگاه جهت دریافت آلارم پس‌زمینه با موفقیت ثبت شد.' });
+});
+
 // Get alarms (All for ADMIN/MANAGER, Targeted/Active for Employee)
 app.get('/api/alarms', (req: Request, res: Response) => {
   const token = (req.headers.authorization || '').replace('Bearer ', '').trim();
@@ -3410,6 +3499,8 @@ app.post('/api/alarms/:id/trigger', requireRole('ADMIN', 'MANAGER'), async (req:
   }
 
   persistDb();
+  broadcastPushAlarm(alarm);
+
   res.json({
     success: true,
     message: `زنگ «${alarm.title}» هم‌اکنون در دستگاه پرسنل به صدا درآمد.`,
@@ -3501,6 +3592,7 @@ setInterval(() => {
               alarm.lastTriggeredAt = nowIso;
               alarm.acknowledgements = [];
               persistDb();
+              broadcastPushAlarm(alarm);
             }
           }
         }
@@ -3517,6 +3609,7 @@ setInterval(() => {
             a.lastTriggeredAt = nowIso;
             a.acknowledgements = [];
             persistDb();
+            broadcastPushAlarm(a);
           }
         }
       }

@@ -25,6 +25,7 @@ import { User, Role, CompanySettings } from '../../types';
 import { getTodayShamsiDetailed } from '../../utils/dateUtils';
 import { StorageService } from '../../services/storage';
 import { DeveloperBadge } from './DeveloperBadge';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface HeaderProps {
   currentUser: User;
@@ -290,6 +291,9 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right Side: Alerts, Reset, User Switcher / Login */}
           <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            {/* PWA Install Button */}
+            <PWAInstallButton variant="subtle" className="hidden sm:flex" />
+
             {/* Pending Alerts / Notifications */}
             <button
               onClick={onNavigateToRequests}

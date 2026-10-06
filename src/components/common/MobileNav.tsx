@@ -24,6 +24,7 @@ import {
 import { Role, User } from '../../types';
 import { NavTab } from './Sidebar';
 import { DeveloperBadge } from './DeveloperBadge';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface MobileNavProps {
   activeTab: NavTab;
@@ -258,6 +259,11 @@ export const MobileNav: React.FC<MobileNavProps> = ({
                   </button>
                 );
               })}
+            </div>
+
+            {/* PWA Install Button on mobile */}
+            <div className="p-3 border-t border-slate-100">
+              <PWAInstallButton className="w-full justify-center py-2.5" />
             </div>
 
             {/* Logout button if provided */}

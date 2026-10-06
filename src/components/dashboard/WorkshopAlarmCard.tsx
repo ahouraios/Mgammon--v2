@@ -22,6 +22,7 @@ import {
 import { WorkshopAlarm, AlarmRingtone, AlarmType, AlarmTargetType, Employee, CompanySettings } from '../../types';
 import { StorageService } from '../../services/storage';
 import { playAlarmSound, stopAlarmSound } from '../../utils/soundAlerts';
+import { PWAAlarmService } from '../../utils/pwaAlarmService';
 import { getTodayShamsi } from '../../utils/dateUtils';
 
 interface WorkshopAlarmCardProps {
@@ -76,8 +77,11 @@ export const WorkshopAlarmCard: React.FC<WorkshopAlarmCardProps> = ({
     try {
       const data = await StorageService.fetchAlarmsAsync();
       setAlarms(data);
+      PWAAlarmService.syncAlarms(data);
     } catch {
-      setAlarms(StorageService.getAlarmsRaw());
+      const fallback = StorageService.getAlarmsRaw();
+      setAlarms(fallback);
+      PWAAlarmService.syncAlarms(fallback);
     } finally {
       setIsLoading(false);
     }
