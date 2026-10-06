@@ -18,7 +18,7 @@ export default defineConfig(() => {
           'pwa-192x192.png',
           'pwa-512x512.png',
           'pwa-maskable-512x512.png',
-          'sw-alarm-handler.js'
+          'alarm-bell.wav'
         ],
         manifest: {
           id: '/',
@@ -56,6 +56,7 @@ export default defineConfig(() => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           importScripts: ['/sw-alarm-handler.js'],
           runtimeCaching: [
             {
@@ -90,13 +91,54 @@ export default defineConfig(() => {
         },
         devOptions: {
           enabled: true,
-          type: 'module',
+          type: 'classic',
         },
       }),
     ],
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname || '.', '.'),
+      },
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
+                return 'vendor-react';
+              }
+              if (id.includes('recharts') || id.includes('d3-') || id.includes('victory-vendor')) {
+                return 'vendor-charts';
+              }
+              if (id.includes('lucide-react')) {
+                return 'vendor-icons';
+              }
+              if (id.includes('motion')) {
+                return 'vendor-motion';
+              }
+              if (id.includes('workbox-')) {
+                return 'vendor-workbox';
+              }
+              return 'vendor-misc';
+            }
+            if (id.includes('/components/employee-portal/')) {
+              return 'view-portal';
+            }
+            if (id.includes('/components/employees/')) {
+              return 'view-employees';
+            }
+            if (id.includes('/components/attendance/')) {
+              return 'view-attendance';
+            }
+            if (id.includes('/components/settings/')) {
+              return 'view-settings';
+            }
+            if (id.includes('/components/reports/') || id.includes('/components/payroll/')) {
+              return 'view-reports-payroll';
+            }
+          },
+        },
       },
     },
     server: {

@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
+import http from 'http';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
@@ -3668,13 +3669,34 @@ app.post('/api/upload/banner', (req: Request, res: Response) => {
 // VITE DEV MIDDLEWARE OR PRODUCTION STATIC SERVING
 // ==========================================
 async function startServer() {
+  const httpServer = http.createServer(app);
+
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: process.env.DISABLE_HMR === 'true' ? false : { server: httpServer },
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
+
+    // Fallback for HTML navigation in development mode
+    app.use('*', async (req: Request, res: Response, next: NextFunction) => {
+      const url = req.originalUrl;
+      if (url.startsWith('/api/') || url.startsWith('/uploads/')) {
+        return next();
+      }
+      try {
+        const indexPath = path.resolve(__dirname, 'index.html');
+        let template = fs.readFileSync(indexPath, 'utf-8');
+        template = await vite.transformIndexHtml(url, template);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e) {
+        next(e);
+      }
+    });
   } else {
     const distDir = path.join(__dirname, 'dist');
     app.use(express.static(distDir));
@@ -3683,7 +3705,7 @@ async function startServer() {
     });
   }
 
-  app.listen(Number(PORT) || 3000, '0.0.0.0', () => {
+  httpServer.listen(Number(PORT) || 3000, '0.0.0.0', () => {
     console.log(`M.GAMMON Full-Stack Server running on http://0.0.0.0:${PORT}`);
   });
 }
