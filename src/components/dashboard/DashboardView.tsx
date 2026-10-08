@@ -46,6 +46,8 @@ import {
   Bell,
   BarChart3,
   Home,
+  CheckCheck,
+  CalendarClock,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -69,6 +71,7 @@ import {
   ManagerAdjustmentType,
   CompanySettings,
   HomeworkTask,
+  FinancialReminder,
 } from '../../types';
 import {
   formatNumberFa,
@@ -237,13 +240,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // Total Open Financial Obligations
   const totalPendingFinancialAmount = totalPendingExpenseAmount + totalPendingAdvanceAmount + totalPendingHomeworkWage;
 
-  // 4. Pending Leaves
+  // 4. Financial Reminders sent by Finance Manager to Senior Admin (صورتحساب‌ها، چک‌های صیادی و اقساط)
+  const allFinancialReminders: FinancialReminder[] = StorageService.getFinancialReminders(currentUser);
+  const pendingSentFinancialReminders = allFinancialReminders.filter(
+    (r) => r.isSentToSeniorAdmin && r.status !== 'PAID'
+  );
+  const totalPendingSentFinancialAmount = pendingSentFinancialReminders.reduce(
+    (sum, r) => sum + (r.amount || 0), 0
+  );
+
+  // 5. Pending Leaves
   const pendingLeaves = leaves.filter((l) => l.status === 'PENDING');
 
-  // 5. Pending Manual Attendance Punch Requests
+  // 6. Pending Manual Attendance Punch Requests
   const pendingManualAttendance = attendance.filter((a) => a.approvalStatus === 'PENDING');
 
-  // 6. Open Shifts (Clocked-in without checkout past standard shift hours)
+  // 7. Open Shifts (Clocked-in without checkout past standard shift hours)
   const notCheckedOutEmployees = todayAttendance.filter(
     (a) => a.checkInTime && !a.checkOutTime
   );
@@ -254,7 +266,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     pendingAdvances.length +
     pendingHomeworkTasks.length +
     pendingLeaves.length +
-    pendingManualAttendance.length;
+    pendingManualAttendance.length +
+    pendingSentFinancialReminders.length;
 
   const totalAlertsWithNotCheckedOut = totalUrgentCount + notCheckedOutEmployees.length;
 
@@ -264,6 +277,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const showFeedback = (text: string, success: boolean = true) => {
     setActionFeedback({ text, success });
     setTimeout(() => setActionFeedback(null), 4000);
+  };
+
+  const handleQuickApproveFinancialReminder = (id: string) => {
+    StorageService.changeFinancialReminderStatus(id, 'APPROVED', 'تایید پرداخت از طریق داشبورد مدیریت ارشد');
+    showFeedback('✓ دستور پرداخت مورد مالی توسط مدیر ارشد تایید شد.');
+    onRefresh?.();
+  };
+
+  const handleQuickPayFinancialReminder = (id: string) => {
+    StorageService.changeFinancialReminderStatus(id, 'PAID', 'تسویه و پرداخت نهایی ثبت شد');
+    showFeedback('✓ تسویه و پرداخت چک/قسط با موفقیت ثبت شد.');
+    onRefresh?.();
   };
 
   const handleSettleExpenseNow = (expenseId: string) => {
@@ -1107,6 +1132,96 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Requests & Alerts List */}
         <div className="space-y-3">
           
+          {/* SECTION 0: Financial Reminders, Checks & Installments sent by Finance Manager */}
+          {(activeAlertTab === 'ALL' || activeAlertTab === 'FINANCIAL') && pendingSentFinancialReminders.length > 0 && (
+            <div className="space-y-2 p-4 rounded-3xl bg-gradient-to-br from-indigo-50/90 via-purple-50/60 to-white border-2 border-indigo-200/90 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold text-indigo-950 px-1 pt-1">
+                <span className="flex items-center gap-2 flex-wrap">
+                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse" />
+                  <span className="text-sm">یادآوری‌های مالی، چک‌های صیادی و اقساط ارسالی مدیر منابع مالی ({formatNumberFa(pendingSentFinancialReminders.length)} مورد)</span>
+                  <span className="text-[11px] font-mono text-indigo-700 bg-white px-2 py-0.5 rounded-lg border border-indigo-200">
+                    مجموع: {formatCurrencyTomans(totalPendingSentFinancialAmount)}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('financial-reminders')}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs self-start sm:self-auto"
+                >
+                  <span>ورود به کارتابل چک و اقساط</span>
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="space-y-2.5 pt-1">
+                {pendingSentFinancialReminders.map((rem) => (
+                  <div
+                    key={rem.id}
+                    className="p-3.5 rounded-2xl bg-white border border-indigo-100 hover:border-indigo-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs shrink-0 shadow-xs mt-0.5 ${
+                        rem.type === 'CHECK'
+                          ? 'bg-purple-600 text-white'
+                          : rem.type === 'INSTALLMENT'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-amber-600 text-white'
+                      }`}>
+                        {rem.type === 'CHECK' ? <CheckCheck className="w-5 h-5" /> : rem.type === 'INSTALLMENT' ? <CalendarClock className="w-5 h-5" /> : <Receipt className="w-5 h-5" />}
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-black text-slate-900">{rem.title}</span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
+                            rem.priority === 'URGENT'
+                              ? 'bg-rose-100 text-rose-800 border-rose-300'
+                              : 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                          }`}>
+                            {rem.priority === 'URGENT' ? 'فوری' : 'عادی'}
+                          </span>
+                          <span className="text-[11px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                            سررسید: {rem.dueDate}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-600 flex items-center gap-2 flex-wrap">
+                          <span>طرف حساب: <strong>{rem.debtorCreditorName}</strong></span>
+                          {rem.bankName && <span>• بانک: {rem.bankName}</span>}
+                          {rem.checkNumber && <span className="font-mono">• چک: {rem.checkNumber}</span>}
+                          {rem.installmentNumber && <span>• {rem.installmentNumber}</span>}
+                        </div>
+                        <div className="text-sm font-black text-indigo-900 font-mono">
+                          مبلغ: {formatCurrencyTomans(rem.amount)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quick actions for Senior Admin */}
+                    <div className="flex items-center gap-2 self-end md:self-center shrink-0 flex-wrap">
+                      {rem.status !== 'APPROVED' && (
+                        <button
+                          type="button"
+                          onClick={() => handleQuickApproveFinancialReminder(rem.id)}
+                          className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-xs font-bold border border-indigo-300 transition-colors cursor-pointer"
+                        >
+                          تایید دستور پرداخت
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleQuickPayFinancialReminder(rem.id)}
+                        className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs flex items-center gap-1"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>تسویه و پرداخت شد</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* SECTION A: Personal Card Expenses (High Priority Financial) */}
           {(activeAlertTab === 'ALL' || activeAlertTab === 'FINANCIAL') && pendingExpenses.length > 0 && (
             <div className="space-y-2">

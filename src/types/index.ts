@@ -81,6 +81,8 @@ export interface User {
   managementRoles?: string[]; // نقش‌های اختیارات مدیریتی
   workshopId?: string;
   avatarUrl?: string;
+  isHrManager?: boolean; // مدیر منابع انسانی
+  isFinanceManager?: boolean; // مدیر منابع مالی
 }
 
 export interface Workshop {
@@ -150,6 +152,8 @@ export interface Employee {
   homeworkWagePerUnit?: number; // نرخ پیش‌فرض هر واحد کار در منزل (تومان)
   homeworkDefaultTaskType?: string; // شرح یا نوع کار پیش‌فرض در منزل (اختیاری)
   allowManualAttendance?: boolean; // مجاز به ثبت تردد مستقیم دستی (بدون نیاز به اسکن بارکد/QR)
+  isHrManager?: boolean; // مدیر منابع انسانی (تخصیص خودکار دسترسی‌های پرسنلی و شیفت)
+  isFinanceManager?: boolean; // مدیر منابع مالی (تخصیص خودکار دسترسی‌های مالی، حقوق و صورتحساب/چک)
 }
 
 export interface Shift {
@@ -480,3 +484,33 @@ export interface WorkshopAlarm {
   lastTriggeredAt?: string;
   acknowledgements?: AlarmAcknowledgement[];
 }
+
+export type FinancialReminderType = 'INVOICE' | 'CHECK' | 'INSTALLMENT' | 'BILL' | 'OTHER';
+export type FinancialReminderPriority = 'NORMAL' | 'HIGH' | 'URGENT';
+export type FinancialReminderStatus = 'PENDING' | 'SEEN' | 'APPROVED' | 'PAID' | 'REJECTED';
+
+export interface FinancialReminder {
+  id: string;
+  companyId: string;
+  title: string; // عنوان صورتحساب، چک یا سررسید قسط
+  type: FinancialReminderType;
+  amount: number; // مبلغ به تومان
+  dueDate: string; // تاریخ سررسید (شمسی) e.g. 1405/07/28
+  debtorCreditorName: string; // طرف حساب / نام صادرکننده یا ذینفع یا فروشگاه
+  bankName?: string; // نام بانک (برای چک‌ها)
+  checkNumber?: string; // شماره سریال چک یا شناسه صیادی ۱۶ رقمی
+  installmentNumber?: string; // شماره و شرح قسط (مثلاً: قسط ۴ از ۱۲)
+  description?: string; // توضیحات و یادداشت
+  priority: FinancialReminderPriority;
+  status: FinancialReminderStatus;
+  createdByEmployeeId: string; // شناسه مدیر مالی ثبت‌کننده
+  createdByName: string;
+  createdAt: string;
+  isSentToSeniorAdmin: boolean; // آیا به پنل و کارتابل مدیر ارشد ارسال شده
+  sentAt?: string;
+  seenBySeniorAdmin: boolean; // آیا مدیر ارشد مشاهده کرده
+  seenAt?: string;
+  adminFeedback?: string; // دستور یا یادداشت مدیر ارشد
+  paidAt?: string;
+}
+

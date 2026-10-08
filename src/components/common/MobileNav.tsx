@@ -20,6 +20,7 @@ import {
   Camera,
   LogOut,
   Bell,
+  Receipt
 } from 'lucide-react';
 import { Role, User } from '../../types';
 import { NavTab } from './Sidebar';
@@ -37,6 +38,7 @@ interface MobileNavProps {
   onLogout?: () => void;
   pendingLeavesCount: number;
   pendingAdvancesCount: number;
+  pendingFinancialCount?: number;
 }
 
 export const MobileNav: React.FC<MobileNavProps> = ({
@@ -50,6 +52,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
   onLogout,
   pendingLeavesCount,
   pendingAdvancesCount,
+  pendingFinancialCount = 0,
 }) => {
   const activeRole = currentRole || role || currentUser?.role || 'ADMIN';
   const totalPending = pendingLeavesCount + pendingAdvancesCount;
@@ -70,7 +73,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
         { id: 'employees' as NavTab, label: 'پرسنل', icon: Users },
         { id: 'attendance' as NavTab, label: 'ترددها', icon: Clock },
         { id: 'qr-kiosk' as NavTab, label: 'پوستر بارکد', icon: Printer },
-        { id: 'messages' as NavTab, label: 'پیام‌ها', icon: MessageSquare },
+        { id: 'financial-reminders' as NavTab, label: 'چک و اقساط', icon: Receipt, badge: pendingFinancialCount },
       ];
     }
     // ADMIN
@@ -78,15 +81,22 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       { id: 'dashboard' as NavTab, label: 'داشبورد', icon: LayoutDashboard },
       { id: 'employees' as NavTab, label: 'پرسنل', icon: Users },
       { id: 'attendance' as NavTab, label: 'ترددها', icon: Clock },
-      { id: 'qr-kiosk' as NavTab, label: 'پوستر بارکد', icon: Printer },
+      { id: 'financial-reminders' as NavTab, label: 'چک و اقساط', icon: Receipt, badge: pendingFinancialCount },
       { id: 'messages' as NavTab, label: 'پیام‌ها', icon: MessageSquare },
     ];
   };
 
+  interface NavDrawerItem {
+    id: NavTab;
+    label: string;
+    icon: any;
+    badge?: number;
+  }
+
   // Full item list for Drawer
-  const getAllNavItems = () => {
+  const getAllNavItems = (): NavDrawerItem[] => {
     if (activeRole === 'EMPLOYEE') {
-      return [
+      const list: NavDrawerItem[] = [
         { id: 'employee-portal' as NavTab, label: 'میز کار پرسنلی', icon: UserCheck },
         { id: 'attendance' as NavTab, label: 'ثبت تردد با دوربین و GPS', icon: Camera },
         { id: 'qr-kiosk' as NavTab, label: 'پوستر بارکدهای کارگاه', icon: Printer },
@@ -94,6 +104,10 @@ export const MobileNav: React.FC<MobileNavProps> = ({
         { id: 'advances' as NavTab, label: 'درخواست مساعده', icon: Wallet },
         { id: 'payroll' as NavTab, label: 'فیش‌های حقوقی', icon: CreditCard },
       ];
+      if (currentUser?.isFinanceManager) {
+        list.push({ id: 'financial-reminders' as NavTab, label: 'صورتحساب و چک‌ها', icon: Receipt, badge: pendingFinancialCount });
+      }
+      return list;
     }
     if (activeRole === 'MANAGER') {
       return [
@@ -106,6 +120,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
         { id: 'leaves' as NavTab, label: 'بررسی مرخصی‌ها', icon: PlaneTakeoff, badge: pendingLeavesCount },
         { id: 'advances' as NavTab, label: 'بررسی مساعده‌ها', icon: Wallet, badge: pendingAdvancesCount },
         { id: 'payroll' as NavTab, label: 'حقوق و دستمزد', icon: CreditCard },
+        { id: 'financial-reminders' as NavTab, label: 'صورتحساب و چک‌ها', icon: Receipt, badge: pendingFinancialCount },
         { id: 'reports' as NavTab, label: 'گزارشات آماری', icon: BarChart3 },
         { id: 'settings' as NavTab, label: 'تنظیمات قوانین', icon: Settings },
       ];
@@ -122,6 +137,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       { id: 'leaves' as NavTab, label: 'مدیریت مرخصی‌ها', icon: PlaneTakeoff, badge: pendingLeavesCount },
       { id: 'advances' as NavTab, label: 'مدیریت مساعده‌ها', icon: Wallet, badge: pendingAdvancesCount },
       { id: 'payroll' as NavTab, label: 'محاسبه حقوق و دستمزد', icon: CreditCard },
+      { id: 'financial-reminders' as NavTab, label: 'صورتحساب‌ها و چک‌های صیادی', icon: Receipt, badge: pendingFinancialCount },
       { id: 'reports' as NavTab, label: 'گزارشات و خروجی اکسل', icon: BarChart3 },
       { id: 'settings' as NavTab, label: 'تنظیمات و لاگ وقایع', icon: Settings },
     ];

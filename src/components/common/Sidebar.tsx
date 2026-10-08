@@ -16,7 +16,8 @@ import {
   Printer,
   Camera,
   LogOut,
-  Bell
+  Bell,
+  Receipt
 } from 'lucide-react';
 import { Role } from '../../types';
 import { DeveloperBadge } from './DeveloperBadge';
@@ -32,6 +33,7 @@ export type NavTab =
   | 'advances'
   | 'messages'
   | 'payroll'
+  | 'financial-reminders'
   | 'reports'
   | 'employee-portal'
   | 'settings';
@@ -43,6 +45,8 @@ interface SidebarProps {
   currentRole?: Role;
   pendingLeavesCount: number;
   pendingAdvancesCount: number;
+  pendingFinancialCount?: number;
+  isFinanceManager?: boolean;
   onLogout?: () => void;
 }
 
@@ -53,13 +57,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentRole,
   pendingLeavesCount,
   pendingAdvancesCount,
+  pendingFinancialCount = 0,
+  isFinanceManager = false,
   onLogout,
 }) => {
   const activeRole = currentRole || role || 'ADMIN';
 
   const getNavItems = () => {
     if (activeRole === 'EMPLOYEE') {
-      return [
+      const base = [
         { id: 'employee-portal' as NavTab, label: 'میز کار پرسنلی', icon: UserCheck, count: 0 },
         { id: 'attendance' as NavTab, label: 'تردد و اسکن با دوربین', icon: Camera, count: 0 },
         { id: 'qr-kiosk' as NavTab, label: 'پوستر بارکدهای کارگاه', icon: Printer, count: 0 },
@@ -67,6 +73,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'advances' as NavTab, label: 'درخواست مساعده', icon: Wallet, count: 0 },
         { id: 'payroll' as NavTab, label: 'فیش‌های حقوقی من', icon: CreditCard, count: 0 },
       ];
+      if (isFinanceManager) {
+        base.push({ id: 'financial-reminders' as NavTab, label: 'صورتحساب و چک‌ها', icon: Receipt, count: pendingFinancialCount });
+      }
+      return base;
     }
 
     if (activeRole === 'MANAGER') {
@@ -80,6 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'leaves' as NavTab, label: 'بررسی مرخصی‌ها', icon: PlaneTakeoff, count: pendingLeavesCount },
         { id: 'advances' as NavTab, label: 'بررسی مساعده‌ها', icon: Wallet, count: pendingAdvancesCount },
         { id: 'payroll' as NavTab, label: 'حقوق و دستمزد', icon: CreditCard, count: 0 },
+        { id: 'financial-reminders' as NavTab, label: 'صورتحساب و چک‌ها', icon: Receipt, count: pendingFinancialCount },
         { id: 'reports' as NavTab, label: 'گزارشات آماری', icon: BarChart3, count: 0 },
         { id: 'settings' as NavTab, label: 'تنظیمات قوانین', icon: Settings, count: 0 },
       ];
@@ -97,6 +108,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'leaves' as NavTab, label: 'مدیریت مرخصی‌ها', icon: PlaneTakeoff, count: pendingLeavesCount },
       { id: 'advances' as NavTab, label: 'مدیریت مساعده‌ها', icon: Wallet, count: pendingAdvancesCount },
       { id: 'payroll' as NavTab, label: 'محاسبه حقوق و دستمزد', icon: CreditCard, count: 0 },
+      { id: 'financial-reminders' as NavTab, label: 'صورتحساب و چک‌ها', icon: Receipt, count: pendingFinancialCount },
       { id: 'reports' as NavTab, label: 'گزارشات و خروجی اکسل', icon: BarChart3, count: 0 },
       { id: 'settings' as NavTab, label: 'تنظیمات و رهگیری وقایع', icon: Settings, count: 0 },
     ];

@@ -9,7 +9,8 @@ import {
   AuditLog,
   User,
   BonusOrPenalty,
-  BroadcastMessage
+  BroadcastMessage,
+  FinancialReminder
 } from '../types';
 import { getTodayShamsi } from '../utils/dateUtils';
 
@@ -151,3 +152,63 @@ export const initialAuditLogs: AuditLog[] = [
 ];
 
 export const initialBroadcastMessages: BroadcastMessage[] = [];
+
+export const initialFinancialReminders: FinancialReminder[] = [
+  {
+    id: 'fin_rem_1',
+    companyId: 'comp_mgommon_01',
+    title: 'چک صیادی شماره ۹۸۴۳۵/۰۲ بابت خرید الوار راش و گردو',
+    type: 'CHECK',
+    amount: 45000000,
+    dueDate: '1405/07/25',
+    debtorCreditorName: 'بازرگانی چوب برادران رضوی',
+    bankName: 'بانک ملت - شعبه آزادی مشهد',
+    checkNumber: '۹۸۴۳۵/۰۲ - شناسه صیاد: ۱۸۳۹۴۷۲۸۱۹۲۳۴۵۶۱',
+    description: 'خرید ۲۰ متر مکعب الوار راش گرجستان درجه یک جهت صفحه تخته‌نرد',
+    priority: 'URGENT',
+    status: 'PENDING',
+    createdByEmployeeId: 'emp_finance_init',
+    createdByName: 'مدیر امور مالی',
+    createdAt: `${today} - ۰۹:۳۰`,
+    isSentToSeniorAdmin: true,
+    sentAt: `${today} - ۰۹:۳۲`,
+    seenBySeniorAdmin: false
+  },
+  {
+    id: 'fin_rem_2',
+    companyId: 'comp_mgommon_01',
+    title: 'قسط شماره ۶ وام خرید دستگاه لیزر و CNC حکاکی',
+    type: 'INSTALLMENT',
+    amount: 18500000,
+    dueDate: '1405/07/28',
+    debtorCreditorName: 'بانک صادرات ایران',
+    installmentNumber: 'قسط ۶ از ۲۴',
+    description: 'تسهیلات خرید تجهیزات کارگاهی خط ۲ مونتاژ',
+    priority: 'HIGH',
+    status: 'PENDING',
+    createdByEmployeeId: 'emp_finance_init',
+    createdByName: 'مدیر امور مالی',
+    createdAt: `${today} - ۱۰:۱۵`,
+    isSentToSeniorAdmin: true,
+    sentAt: `${today} - ۱۰:۱۶`,
+    seenBySeniorAdmin: false
+  },
+  {
+    id: 'fin_rem_3',
+    companyId: 'comp_mgommon_01',
+    title: 'صورتحساب خرید رنگ پلی‌استر، سیلر و کیلر کارگاه رنگ‌کاری',
+    type: 'INVOICE',
+    amount: 12800000,
+    dueDate: '1405/08/02',
+    debtorCreditorName: 'فروشگاه رنگ و رزین کمالی',
+    description: 'فاکتور شماره ۸۲۷۴ بابت تأمین مواد اولیه رنگ‌کاری ۵۰ دست تخته‌نرد اعلا',
+    priority: 'NORMAL',
+    status: 'PENDING',
+    createdByEmployeeId: 'emp_finance_init',
+    createdByName: 'مدیر امور مالی',
+    createdAt: `${today} - ۱۱:۰۰`,
+    isSentToSeniorAdmin: true,
+    sentAt: `${today} - ۱۱:۰۵`,
+    seenBySeniorAdmin: false
+  }
+];

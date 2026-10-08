@@ -20,6 +20,7 @@ import { SettingsView } from './components/settings/SettingsView';
 import { EmployeePortalView } from './components/employee-portal/EmployeePortalView';
 import { MessagesView } from './components/messages/MessagesView';
 import { AlarmsView } from './components/alarms/AlarmsView';
+import { FinancialRemindersView } from './components/financial/FinancialRemindersView';
 
 // Service & Types
 import { StorageService } from './services/storage';
@@ -33,7 +34,8 @@ import {
   CompanySettings,
   AuditLog,
   User,
-  BroadcastMessage
+  BroadcastMessage,
+  FinancialReminder
 } from './types';
 
 export default function App() {
@@ -55,6 +57,7 @@ export default function App() {
   const [settings, setSettings] = useState<CompanySettings>(() => StorageService.getSettings());
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [messages, setMessages] = useState<BroadcastMessage[]>([]);
+  const [financialReminders, setFinancialReminders] = useState<FinancialReminder[]>([]);
 
   // Load / refresh data from StorageService
   const loadData = (userOverride?: User) => {
@@ -68,6 +71,7 @@ export default function App() {
     setSettings(StorageService.getSettings());
     setAuditLogs(StorageService.getAuditLogs(activeU));
     setMessages(StorageService.getMessages(activeU));
+    setFinancialReminders(StorageService.getFinancialReminders(activeU));
   };
 
   useEffect(() => {
@@ -95,6 +99,9 @@ export default function App() {
     if (!currentUser) return;
     if (currentUser.role === 'EMPLOYEE') {
       const allowedTabs: NavTab[] = ['employee-portal', 'attendance', 'qr-kiosk', 'leaves', 'advances', 'payroll'];
+      if (currentUser.isFinanceManager) {
+        allowedTabs.push('financial-reminders');
+      }
       if (!allowedTabs.includes(activeTab)) {
         setActiveTab('employee-portal');
       }
@@ -139,6 +146,7 @@ export default function App() {
   // Pending counts for badges
   const pendingLeaves = leaves.filter((l) => l.status === 'PENDING').length;
   const pendingAdvances = advances.filter((a) => a.status === 'PENDING').length;
+  const pendingFinancialCount = financialReminders.filter((r) => r.isSentToSeniorAdmin && r.status !== 'PAID').length;
 
   return (
     <div
@@ -151,9 +159,9 @@ export default function App() {
           currentUser={currentUser}
           onUserChange={handleUserChange}
           onLogout={handleLogout}
-          onNavigateToRequests={() => setActiveTab('leaves')}
+          onNavigateToRequests={() => setActiveTab(currentUser.role === 'ADMIN' && pendingFinancialCount > 0 ? 'financial-reminders' : 'leaves')}
           onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          pendingRequestsCount={pendingLeaves + pendingAdvances}
+          pendingRequestsCount={pendingLeaves + pendingAdvances + (currentUser.role === 'ADMIN' ? pendingFinancialCount : 0)}
         />
       )}
 
@@ -166,6 +174,8 @@ export default function App() {
           onSelectTab={setActiveTab}
           pendingLeavesCount={pendingLeaves}
           pendingAdvancesCount={pendingAdvances}
+          pendingFinancialCount={pendingFinancialCount}
+          isFinanceManager={Boolean(currentUser.isFinanceManager)}
           onLogout={handleLogout}
         />
 
@@ -179,6 +189,7 @@ export default function App() {
           onSelectTab={setActiveTab}
           pendingLeavesCount={pendingLeaves}
           pendingAdvancesCount={pendingAdvances}
+          pendingFinancialCount={pendingFinancialCount}
           onLogout={handleLogout}
         />
 
@@ -293,7 +304,17 @@ export default function App() {
               employees={employees}
               currentUser={currentUser}
               onRefresh={loadData}
-              canManage={currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER'}
+              canManage={currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER' || Boolean(currentUser.isFinanceManager)}
+            />
+          )}
+
+          {activeTab === 'financial-reminders' && (
+            <FinancialRemindersView
+              currentUser={currentUser}
+              employees={employees}
+              reminders={financialReminders}
+              onRefresh={loadData}
+              canManage={currentUser.role === 'ADMIN' || Boolean(currentUser.isFinanceManager)}
             />
           )}
 

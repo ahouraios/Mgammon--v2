@@ -34,7 +34,10 @@ import {
   Home,
   CheckCircle2,
   Fingerprint,
-  UserCheck
+  UserCheck,
+  Briefcase,
+  Landmark,
+  Receipt
 } from 'lucide-react';
 import { Employee, Shift, User as AppUser, PERMISSION_LEVELS, MANAGEMENT_ROLES, ManagementRole } from '../../types';
 import {
@@ -185,10 +188,12 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     homeworkWagePerUnit: 0,
     homeworkDefaultTaskType: 'مونتاژ و پرداخت قطعات',
     allowManualAttendance: false,
+    isHrManager: false,
+    isFinanceManager: false,
   };
 
   const [formData, setFormData] = useState<Omit<Employee, 'id' | 'companyId'>>(defaultFormData);
-  const [featureFilter, setFeatureFilter] = useState<'ALL' | 'HOMEWORK' | 'MANUAL_ATTENDANCE'>('ALL');
+  const [featureFilter, setFeatureFilter] = useState<'ALL' | 'HOMEWORK' | 'MANUAL_ATTENDANCE' | 'HR_MANAGERS' | 'FINANCE_MANAGERS'>('ALL');
 
   const departments = ['ALL', ...Array.from(new Set([...categories, ...employees.map((e) => e.department)]))];
 
@@ -196,6 +201,8 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
   const confidentialCount = employees.filter(e => e.isConfidential).length;
   const homeworkCount = employees.filter(e => e.isHomeworkWorker && (!isManagerOnly || !e.isConfidential)).length;
   const manualAttendanceCount = employees.filter(e => e.allowManualAttendance && (!isManagerOnly || !e.isConfidential)).length;
+  const hrManagersCount = employees.filter(e => e.isHrManager && (!isManagerOnly || !e.isConfidential)).length;
+  const financeManagersCount = employees.filter(e => e.isFinanceManager && (!isManagerOnly || !e.isConfidential)).length;
 
   const filteredEmployees = employees.filter((emp) => {
     // If Manager (HR), confidential employees are strictly hidden!
@@ -212,7 +219,9 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     const matchesFeature =
       featureFilter === 'ALL' ||
       (featureFilter === 'HOMEWORK' && emp.isHomeworkWorker) ||
-      (featureFilter === 'MANUAL_ATTENDANCE' && emp.allowManualAttendance);
+      (featureFilter === 'MANUAL_ATTENDANCE' && emp.allowManualAttendance) ||
+      (featureFilter === 'HR_MANAGERS' && emp.isHrManager) ||
+      (featureFilter === 'FINANCE_MANAGERS' && emp.isFinanceManager);
     return matchesSearch && matchesDept && matchesStatus && matchesFeature;
   });
 
@@ -246,6 +255,8 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
       homeworkWagePerUnit: 0,
       homeworkDefaultTaskType: 'مونتاژ و پرداخت قطعات',
       allowManualAttendance: false,
+      isHrManager: false,
+      isFinanceManager: false,
     });
     setIsFormModalOpen(true);
   };
@@ -292,6 +303,8 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
       homeworkWagePerUnit: emp.homeworkWagePerUnit || 0,
       homeworkDefaultTaskType: emp.homeworkDefaultTaskType || 'مونتاژ و پرداخت قطعات',
       allowManualAttendance: Boolean(emp.allowManualAttendance),
+      isHrManager: Boolean(emp.isHrManager),
+      isFinanceManager: Boolean(emp.isFinanceManager),
     });
     setIsFormModalOpen(true);
   };
@@ -329,6 +342,18 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
       'پرسنل',
       `دسترسی ثبت تردد دستی بدون QR برای ${target?.firstName} ${target?.lastName} به ${target?.allowManualAttendance ? 'فعال' : 'غیرفعال'} تغییر یافت.`
     );
+    onRefresh();
+  };
+
+  // Toggle HR Manager Role (Super Admin only)
+  const handleToggleHrManager = (empId: string) => {
+    StorageService.toggleHrManager(empId);
+    onRefresh();
+  };
+
+  // Toggle Finance Manager Role (Super Admin only)
+  const handleToggleFinanceManager = (empId: string) => {
+    StorageService.toggleFinanceManager(empId);
     onRefresh();
   };
 
@@ -711,6 +736,30 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
             <CheckCircle2 className="w-3 h-3" />
             <span>ثبت تردد دستی بدون QR ({manualAttendanceCount})</span>
           </button>
+          <button
+            type="button"
+            onClick={() => setFeatureFilter('HR_MANAGERS')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+              featureFilter === 'HR_MANAGERS'
+                ? 'bg-purple-700 text-white shadow-xs'
+                : 'bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-200'
+            }`}
+          >
+            <Briefcase className="w-3 h-3 text-purple-600" />
+            <span>مدیران منابع انسانی ({hrManagersCount})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFeatureFilter('FINANCE_MANAGERS')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+              featureFilter === 'FINANCE_MANAGERS'
+                ? 'bg-teal-700 text-white shadow-xs'
+                : 'bg-teal-50 text-teal-800 hover:bg-teal-100 border border-teal-200'
+            }`}
+          >
+            <Landmark className="w-3 h-3 text-teal-600" />
+            <span>مدیران منابع مالی ({financeManagersCount})</span>
+          </button>
         </div>
       </div>
 
@@ -757,6 +806,16 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                           {emp.allowManualAttendance && (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-200 flex items-center gap-0.5">
                               <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" /> تردد دستی (بدون QR)
+                            </span>
+                          )}
+                          {emp.isHrManager && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-200 flex items-center gap-0.5">
+                              <Briefcase className="w-2.5 h-2.5 text-purple-600" /> مدیر منابع انسانی
+                            </span>
+                          )}
+                          {emp.isFinanceManager && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-900 border border-teal-200 flex items-center gap-0.5">
+                              <Landmark className="w-2.5 h-2.5 text-teal-600" /> مدیر منابع مالی
                             </span>
                           )}
                         </div>
@@ -875,6 +934,34 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                         >
                           <CheckCircle2 className="w-4 h-4" />
                         </button>
+                        {isSuperAdmin && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleHrManager(emp.id)}
+                              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                emp.isHrManager
+                                  ? 'bg-purple-100 text-purple-800 hover:bg-purple-200 border border-purple-300 font-bold'
+                                  : 'bg-slate-100 text-slate-400 hover:text-purple-700 hover:bg-purple-50'
+                              }`}
+                              title={emp.isHrManager ? 'خلع سمت مدیر منابع انسانی' : 'اعطای سمت مدیر منابع انسانی به این پرسنل'}
+                            >
+                              <Briefcase className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleFinanceManager(emp.id)}
+                              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                emp.isFinanceManager
+                                  ? 'bg-teal-100 text-teal-800 hover:bg-teal-200 border border-teal-300 font-bold'
+                                  : 'bg-slate-100 text-slate-400 hover:text-teal-700 hover:bg-teal-50'
+                              }`}
+                              title={emp.isFinanceManager ? 'خلع سمت مدیر منابع مالی' : 'اعطای سمت مدیر منابع مالی به این پرسنل'}
+                            >
+                              <Landmark className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
                         <button
                           type="button"
                           onClick={() => handleOpenPermissionsModal(emp)}
@@ -981,6 +1068,16 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                                   <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" /> تردد دستی
                                 </span>
                               )}
+                              {emp.isHrManager && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-200 flex items-center gap-0.5">
+                                  <Briefcase className="w-2.5 h-2.5 text-purple-600" /> مدیر منابع انسانی
+                                </span>
+                              )}
+                              {emp.isFinanceManager && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-900 border border-teal-200 flex items-center gap-0.5">
+                                  <Landmark className="w-2.5 h-2.5 text-teal-600" /> مدیر منابع مالی
+                                </span>
+                              )}
                             </div>
                             <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
                               <Phone className="w-3 h-3 text-slate-400" />
@@ -1073,6 +1170,34 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                           >
                             <CheckCircle2 className="w-4 h-4" />
                           </button>
+                          {isSuperAdmin && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleHrManager(emp.id)}
+                                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                  emp.isHrManager
+                                    ? 'bg-purple-100 text-purple-800 hover:bg-purple-200 border border-purple-300 font-bold'
+                                    : 'text-slate-400 hover:text-purple-700 hover:bg-purple-50'
+                                }`}
+                                title={emp.isHrManager ? 'خلع سمت مدیر منابع انسانی' : 'اعطای سمت مدیر منابع انسانی (تخصیص خودکار دسترسی‌های HR)'}
+                              >
+                                <Briefcase className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleFinanceManager(emp.id)}
+                                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                  emp.isFinanceManager
+                                    ? 'bg-teal-100 text-teal-800 hover:bg-teal-200 border border-teal-300 font-bold'
+                                    : 'text-slate-400 hover:text-teal-700 hover:bg-teal-50'
+                                }`}
+                                title={emp.isFinanceManager ? 'خلع سمت مدیر منابع مالی' : 'اعطای سمت مدیر منابع مالی (تخصیص خودکار دسترسی‌های مالی و ارسال چک/اقساط)'}
+                              >
+                                <Landmark className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
                           <button
                             onClick={() => setViewingProfile(emp)}
                             className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
@@ -1267,13 +1392,37 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                 )}
 
                 {viewingProfile.allowManualAttendance && (
-                  <div className="mt-3 pt-3 border-t border-emerald-100 bg-emerald-50/70 -mx-4 -mb-4 p-3 rounded-b-xl text-xs space-y-1">
+                  <div className="mt-3 pt-3 border-t border-emerald-100 bg-emerald-50/70 -mx-4 -mb-4 p-3 text-xs space-y-1">
                     <div className="font-bold text-emerald-950 flex items-center gap-1.5">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                       <span>ثبت تردد صرفاً به‌صورت دستی فعال است (بدون نیاز به اسکن QR)</span>
                     </div>
                     <p className="text-[11px] text-emerald-800 leading-relaxed">
                       این پرسنل مجاز به ثبت ورود و خروج مستقیم دستی در پنل خود بدون اسکن دوربین کارگاه می‌باشد.
+                    </p>
+                  </div>
+                )}
+
+                {viewingProfile.isHrManager && (
+                  <div className="mt-3 pt-3 border-t border-purple-100 bg-purple-50/80 -mx-4 -mb-4 p-3 text-xs space-y-1">
+                    <div className="font-bold text-purple-950 flex items-center gap-1.5">
+                      <Briefcase className="w-4 h-4 text-purple-700" />
+                      <span>سمت سازمانی: مدیر منابع انسانی (HR Manager)</span>
+                    </div>
+                    <p className="text-[11px] text-purple-800 leading-relaxed">
+                      دارای دسترسی‌های پیش‌فرض به مدیریت پرسنل، بررسی مرخصی‌ها، شیفت‌ها، نظارت تردد کارگاه و پیام‌رسانی.
+                    </p>
+                  </div>
+                )}
+
+                {viewingProfile.isFinanceManager && (
+                  <div className="mt-3 pt-3 border-t border-teal-100 bg-teal-50/80 -mx-4 -mb-4 p-3 rounded-b-xl text-xs space-y-1">
+                    <div className="font-bold text-teal-950 flex items-center gap-1.5">
+                      <Landmark className="w-4 h-4 text-teal-700" />
+                      <span>سمت سازمانی: مدیر منابع مالی (Finance Manager)</span>
+                    </div>
+                    <p className="text-[11px] text-teal-800 leading-relaxed">
+                      دارای دسترسی‌های مالی، محاسبه حقوق و دستمزد، بررسی مساعده و ارسال صورتحساب‌ها، یادآوری چک‌ها و سررسید اقساط به پنل مدیر ارشد.
                     </p>
                   </div>
                 )}
@@ -2049,6 +2198,64 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                     formData.allowManualAttendance ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-500 border-slate-200'
                   }`}>
                     {formData.allowManualAttendance ? 'فعال' : 'غیرفعال'}
+                  </span>
+                </div>
+              </div>
+
+              {/* HR MANAGER ROLE ASSIGNMENT (سمت مدیر منابع انسانی) */}
+              <div className="p-4 bg-gradient-to-br from-purple-50/90 to-fuchsia-50/70 border border-purple-200/90 rounded-2xl space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2.5">
+                    <input
+                      type="checkbox"
+                      id="isHrManagerCheck"
+                      checked={Boolean(formData.isHrManager)}
+                      onChange={(e) => setFormData({ ...formData, isHrManager: e.target.checked })}
+                      className="mt-1 w-4 h-4 rounded text-purple-600 focus:ring-purple-500 cursor-pointer"
+                    />
+                    <label htmlFor="isHrManagerCheck" className="text-xs text-purple-950 font-bold cursor-pointer">
+                      <span className="flex items-center gap-1.5">
+                        <Briefcase className="w-4 h-4 text-purple-600" />
+                        <span>انتصاب به عنوان «مدیر منابع انسانی» (HR Manager)</span>
+                      </span>
+                      <span className="block text-[11px] font-normal text-purple-800/90 mt-0.5 leading-relaxed">
+                        با فعال‌سازی این تیک، دسترسی‌های پیش‌فرض مدیریت پرونده پرسنل، تایید و رد مرخصی‌ها، تخصیص شیفت‌ها، نظارت تردد کارگاه و پیام‌رسانی سازمانی به‌صورت کاملاً خودکار به این فرد اعطا می‌شود و در صورت خلع سمت، دسترسی‌ها به‌طور خودکار محدود می‌گردد.
+                      </span>
+                    </label>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 border ${
+                    formData.isHrManager ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-slate-100 text-slate-500 border-slate-200'
+                  }`}>
+                    {formData.isHrManager ? 'منصوب شده' : 'عادی'}
+                  </span>
+                </div>
+              </div>
+
+              {/* FINANCE MANAGER ROLE ASSIGNMENT (سمت مدیر منابع مالی) */}
+              <div className="p-4 bg-gradient-to-br from-teal-50/90 to-cyan-50/70 border border-teal-200/90 rounded-2xl space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2.5">
+                    <input
+                      type="checkbox"
+                      id="isFinanceManagerCheck"
+                      checked={Boolean(formData.isFinanceManager)}
+                      onChange={(e) => setFormData({ ...formData, isFinanceManager: e.target.checked })}
+                      className="mt-1 w-4 h-4 rounded text-teal-600 focus:ring-teal-500 cursor-pointer"
+                    />
+                    <label htmlFor="isFinanceManagerCheck" className="text-xs text-teal-950 font-bold cursor-pointer">
+                      <span className="flex items-center gap-1.5">
+                        <Landmark className="w-4 h-4 text-teal-600" />
+                        <span>انتصاب به عنوان «مدیر منابع مالی» (Finance Manager)</span>
+                      </span>
+                      <span className="block text-[11px] font-normal text-teal-800/90 mt-0.5 leading-relaxed">
+                        با فعال‌سازی این تیک، دسترسی‌های پیش‌فرض امور مالی شامل محاسبه کارکرد، حقوق و دستمزد، بررسی مساعده و همچنین <strong>ارسال صورتحساب‌ها، یادآوری چک‌های صیادی و تاریخ سررسید اقساط به‌صورت نوتیفیکیشن اختصاصی به پنل مدیر ارشد</strong> فعال می‌گردد.
+                      </span>
+                    </label>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 border ${
+                    formData.isFinanceManager ? 'bg-teal-100 text-teal-800 border-teal-300' : 'bg-slate-100 text-slate-500 border-slate-200'
+                  }`}>
+                    {formData.isFinanceManager ? 'منصوب شده' : 'عادی'}
                   </span>
                 </div>
               </div>

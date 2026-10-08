@@ -330,7 +330,11 @@ export const Header: React.FC<HeaderProps> = ({
                   <div className="text-[10px] text-slate-400 font-medium">
                     {currentUser.role === 'ADMIN'
                       ? 'مالک و مدیر ارشد'
-                      : currentUser.role === 'MANAGER'
+                      : currentUser.isFinanceManager && currentUser.isHrManager
+                      ? 'مدیر منابع مالی و انسانی'
+                      : currentUser.isFinanceManager
+                      ? 'مدیر منابع مالی'
+                      : currentUser.isHrManager || currentUser.role === 'MANAGER'
                       ? 'مدیر منابع انسانی'
                       : 'پرسنل'}
                   </div>
@@ -348,7 +352,11 @@ export const Header: React.FC<HeaderProps> = ({
                     <div className="text-xs font-bold text-slate-800">
                       {currentUser.role === 'ADMIN'
                         ? 'پنل مالک و مدیر ارشد'
-                        : currentUser.role === 'MANAGER'
+                        : currentUser.isFinanceManager && currentUser.isHrManager
+                        ? 'پنل مدیر منابع مالی و انسانی'
+                        : currentUser.isFinanceManager
+                        ? 'پنل مدیر منابع مالی'
+                        : currentUser.isHrManager || currentUser.role === 'MANAGER'
                         ? 'پنل مدیر منابع انسانی'
                         : 'پرتال اختصاصی پرسنل'}
                     </div>

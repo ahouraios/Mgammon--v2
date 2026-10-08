@@ -18,7 +18,9 @@ import {
   WorkMission,
   WorkshopAlarm,
   HomeworkTask,
-  HomeworkTaskStatus
+  HomeworkTaskStatus,
+  FinancialReminder,
+  FinancialReminderStatus
 } from '../types';
 import {
   initialCompanySettings,
@@ -31,7 +33,8 @@ import {
   initialAuditLogs,
   initialUsers,
   initialBonusesPenalties,
-  initialBroadcastMessages
+  initialBroadcastMessages,
+  initialFinancialReminders
 } from '../data/initialData';
 import { getCurrentTimeStr, getTodayShamsi, calculateGpsDistanceMeters, formatCurrencyTomans, getDatesBetweenShamsi, toEnglishDigits, formatCardNumber } from '../utils/dateUtils';
 
@@ -52,6 +55,7 @@ const STORAGE_KEYS = {
   BONUSES: 'mgommon_bonuses_v4',
   MESSAGES: 'mgommon_messages_v4',
   ALARMS: 'mgommon_alarms_v4',
+  FINANCIAL_REMINDERS: 'mgommon_financial_reminders_v4',
   CURRENT_USER: 'mgommon_current_user_v4',
   AUTH_TOKEN: 'mgommon_auth_token_v4',
   REMEMBERED_USER: 'mgommon_remembered_user_v4',
@@ -789,15 +793,32 @@ export class StorageService {
     const cleanNationalCode = toEnglishDigits(emp.nationalCode).trim();
     const cleanCard = emp.cardNumber ? toEnglishDigits(emp.cardNumber).replace(/[\s-]/g, '') : '';
 
+    const isHr = Boolean(emp.isHrManager);
+    const isFin = Boolean(emp.isFinanceManager);
+
+    // Compute automatic permissions based on roles
+    const permsSet = new Set<number>(emp.permissions && emp.permissions.length > 0 ? emp.permissions : [1, 2, 3, 4, 5, 6]);
+    const mgmtRolesSet = new Set<string>(emp.managementRoles || []);
+    if (isHr) {
+      [1, 2, 3, 4, 5, 6, 7, 8, 10].forEach(p => permsSet.add(p));
+      mgmtRolesSet.add('HR_ADMIN');
+    }
+    if (isFin) {
+      [1, 2, 3, 4, 5, 6, 9].forEach(p => permsSet.add(p));
+      mgmtRolesSet.add('FINANCE_OFFICER');
+    }
+
     const preparedEmp: Employee = {
       ...emp,
       phone: cleanPhone,
       nationalCode: cleanNationalCode,
       cardNumber: cleanCard,
       personalCode: toEnglishDigits(emp.personalCode).trim(),
-      permissions: emp.permissions && emp.permissions.length > 0 ? emp.permissions : [1, 2, 3, 4, 5, 6],
-      managementRoles: emp.managementRoles || [],
+      permissions: Array.from(permsSet).sort((a, b) => a - b),
+      managementRoles: Array.from(mgmtRolesSet),
       isConfidential: Boolean(emp.isConfidential),
+      isHrManager: isHr,
+      isFinanceManager: isFin,
     };
     list.unshift(preparedEmp);
     this.saveEmployees(list);
@@ -817,11 +838,13 @@ export class StorageService {
       name: `${emp.firstName} ${emp.lastName}`,
       email: emp.email || `${username}@mgommon.ir`,
       phone: cleanPhone,
-      role: 'EMPLOYEE',
+      role: (isHr || isFin) ? 'MANAGER' : 'EMPLOYEE',
       permissions: preparedEmp.permissions,
       managementRoles: preparedEmp.managementRoles,
       workshopId: emp.workshopId || 'ws_1',
-      avatarUrl: emp.avatarUrl
+      avatarUrl: emp.avatarUrl,
+      isHrManager: isHr,
+      isFinanceManager: isFin,
     };
 
     if (!users.some(u => u.username === username || u.employeeId === emp.id)) {
@@ -856,15 +879,46 @@ export class StorageService {
     const cleanNationalCode = toEnglishDigits(emp.nationalCode).trim();
     const cleanCard = emp.cardNumber ? toEnglishDigits(emp.cardNumber).replace(/[\s-]/g, '') : '';
 
+    const isHr = Boolean(emp.isHrManager);
+    const isFin = Boolean(emp.isFinanceManager);
+
+    // Compute permissions if roles changed
+    const permsSet = new Set<number>(finalPermissions && finalPermissions.length > 0 ? finalPermissions : [1, 2, 3, 4, 5, 6]);
+    const mgmtRolesSet = new Set<string>(finalManagementRoles || []);
+    if (isHr) {
+      [1, 2, 3, 4, 5, 6, 7, 8, 10].forEach(p => permsSet.add(p));
+      mgmtRolesSet.add('HR_ADMIN');
+    } else {
+      mgmtRolesSet.delete('HR_ADMIN');
+      if (!isFin) {
+        permsSet.delete(7);
+        permsSet.delete(8);
+        permsSet.delete(10);
+      }
+    }
+
+    if (isFin) {
+      [1, 2, 3, 4, 5, 6, 9].forEach(p => permsSet.add(p));
+      mgmtRolesSet.add('FINANCE_OFFICER');
+    } else {
+      mgmtRolesSet.delete('FINANCE_OFFICER');
+      permsSet.delete(9);
+    }
+
+    const calculatedPerms = Array.from(permsSet).sort((a, b) => a - b);
+    const calculatedRoles = Array.from(mgmtRolesSet);
+
     const preparedEmp: Employee = {
       ...emp,
       phone: cleanPhone,
       nationalCode: cleanNationalCode,
       cardNumber: cleanCard,
       personalCode: toEnglishDigits(emp.personalCode).trim(),
-      permissions: finalPermissions && finalPermissions.length > 0 ? finalPermissions : [1, 2, 3, 4, 5, 6],
-      managementRoles: finalManagementRoles || [],
+      permissions: calculatedPerms,
+      managementRoles: calculatedRoles,
       isConfidential: Boolean(finalConfidential),
+      isHrManager: isHr,
+      isFinanceManager: isFin,
     };
 
     // ALWAYS update raw employees collection! (Fixes DATA-001)
@@ -874,6 +928,10 @@ export class StorageService {
     // ALWAYS update raw users collection! (Fixes DATA-002)
     const users = this.getAllUsersRaw().map(u => {
       if (u.employeeId === emp.id) {
+        let newRole = u.role;
+        if (u.role !== 'ADMIN') {
+          newRole = (isHr || isFin) ? 'MANAGER' : 'EMPLOYEE';
+        }
         return {
           ...u,
           name: `${emp.firstName} ${emp.lastName}`,
@@ -881,21 +939,141 @@ export class StorageService {
           email: emp.email || u.email,
           username: emp.username?.trim().toLowerCase() || u.username,
           password: emp.password?.trim() || u.password,
+          role: newRole,
           permissions: preparedEmp.permissions || u.permissions,
           managementRoles: preparedEmp.managementRoles || u.managementRoles,
           workshopId: emp.workshopId || u.workshopId,
-          avatarUrl: emp.avatarUrl || u.avatarUrl
+          avatarUrl: emp.avatarUrl || u.avatarUrl,
+          isHrManager: isHr,
+          isFinanceManager: isFin,
         };
       }
       return u;
     });
     this.saveUsers(users);
 
+    // If updated user is current active session, refresh it
+    const active = this.getCurrentUser();
+    if (active && active.employeeId === emp.id) {
+      const updatedActive = users.find(u => u.employeeId === emp.id);
+      if (updatedActive) {
+        this.setCurrentUser(updatedActive);
+      }
+    }
+
     this.addAuditLog(
       'ویرایش مشخصات پرسنل',
       'پرسنل',
-      `اطلاعات پرسنل ${emp.firstName} ${emp.lastName} بروزرسانی شد.`
+      `اطلاعات پرسنل ${emp.firstName} ${emp.lastName} بروزرسانی شد (سمت HR: ${isHr ? 'دارد' : 'ندارد'}، سمت مالی: ${isFin ? 'دارد' : 'ندارد'}).`
     );
+  }
+
+  static toggleHrManager(empId: string): void {
+    const list = this.getAllEmployeesRaw().map((e) => {
+      if (e.id === empId) {
+        return { ...e, isHrManager: !e.isHrManager };
+      }
+      return e;
+    });
+    this.saveEmployees(list);
+    const target = list.find((e) => e.id === empId);
+    if (target) {
+      this.syncUserRoleAndPermissions(target);
+      this.addAuditLog(
+        'تغییر سمت مدیر منابع انسانی',
+        'پرسنل',
+        `سمت مدیر منابع انسانی برای ${target.firstName} ${target.lastName} به ${target.isHrManager ? 'منصوب شد (دسترسی‌های منابع انسانی فعال شد)' : 'خلع شد'} تغییر یافت.`
+      );
+    }
+  }
+
+  static toggleFinanceManager(empId: string): void {
+    const list = this.getAllEmployeesRaw().map((e) => {
+      if (e.id === empId) {
+        return { ...e, isFinanceManager: !e.isFinanceManager };
+      }
+      return e;
+    });
+    this.saveEmployees(list);
+    const target = list.find((e) => e.id === empId);
+    if (target) {
+      this.syncUserRoleAndPermissions(target);
+      this.addAuditLog(
+        'تغییر سمت مدیر منابع مالی',
+        'پرسنل',
+        `سمت مدیر منابع مالی برای ${target.firstName} ${target.lastName} به ${target.isFinanceManager ? 'منصوب شد (دسترسی‌های امور مالی و کارتابل چک/اقساط فعال شد)' : 'خلع شد'} تغییر یافت.`
+      );
+    }
+  }
+
+  static syncUserRoleAndPermissions(emp: Employee): void {
+    const isHr = Boolean(emp.isHrManager);
+    const isFin = Boolean(emp.isFinanceManager);
+    
+    const permsSet = new Set<number>(emp.permissions && emp.permissions.length > 0 ? emp.permissions : [1, 2, 3, 4, 5, 6]);
+    const mgmtRolesSet = new Set<string>(emp.managementRoles || []);
+    
+    if (isHr) {
+      [1, 2, 3, 4, 5, 6, 7, 8, 10].forEach(p => permsSet.add(p));
+      mgmtRolesSet.add('HR_ADMIN');
+    } else {
+      mgmtRolesSet.delete('HR_ADMIN');
+      if (!isFin) {
+        permsSet.delete(7);
+        permsSet.delete(8);
+        permsSet.delete(10);
+      }
+    }
+
+    if (isFin) {
+      [1, 2, 3, 4, 5, 6, 9].forEach(p => permsSet.add(p));
+      mgmtRolesSet.add('FINANCE_OFFICER');
+    } else {
+      mgmtRolesSet.delete('FINANCE_OFFICER');
+      permsSet.delete(9);
+    }
+
+    const calculatedPerms = Array.from(permsSet).sort((a, b) => a - b);
+    const calculatedRoles = Array.from(mgmtRolesSet);
+
+    // Update raw employee
+    const emps = this.getAllEmployeesRaw().map(e => e.id === emp.id ? {
+      ...e,
+      permissions: calculatedPerms,
+      managementRoles: calculatedRoles,
+      isHrManager: isHr,
+      isFinanceManager: isFin
+    } : e);
+    this.saveEmployees(emps);
+
+    // Update user
+    const users = this.getAllUsersRaw().map(u => {
+      if (u.employeeId === emp.id) {
+        let newRole = u.role;
+        if (u.role !== 'ADMIN') {
+          newRole = (isHr || isFin) ? 'MANAGER' : 'EMPLOYEE';
+        }
+        return {
+          ...u,
+          role: newRole,
+          permissions: calculatedPerms,
+          managementRoles: calculatedRoles,
+          isHrManager: isHr,
+          isFinanceManager: isFin
+        };
+      }
+      return u;
+    });
+    this.saveUsers(users);
+
+    // If active session is this user, refresh it
+    const cur = this.getCurrentUser();
+    if (cur && cur.employeeId === emp.id) {
+      const updatedCur = users.find(u => u.employeeId === emp.id);
+      if (updatedCur) {
+        this.setCurrentUser(updatedCur);
+      }
+    }
   }
 
   static deleteEmployee(id: string): void {
@@ -943,6 +1121,114 @@ export class StorageService {
     });
     this.saveUsers(users);
     this.addAuditLog('تغییر سطح دسترسی', 'پرسنل', `سطح دسترسی پرسنل ${empId} به [${permissions.join(', ')}] بروزرسانی شد.`);
+  }
+
+  // ==========================================================
+  // FINANCIAL REMINDERS, INVOICES, CHECKS & INSTALLMENTS
+  // (کارتابل صورتحساب‌ها، چک‌های صیادی و سررسید اقساط مدیر مالی و مدیر ارشد)
+  // ==========================================================
+
+  static getFinancialReminders(requestingUser?: User): FinancialReminder[] {
+    const list = getItem<FinancialReminder[]>(STORAGE_KEYS.FINANCIAL_REMINDERS, initialFinancialReminders);
+    return list;
+  }
+
+  static saveFinancialReminders(reminders: FinancialReminder[]): void {
+    setItem(STORAGE_KEYS.FINANCIAL_REMINDERS, reminders);
+  }
+
+  static addFinancialReminder(item: FinancialReminder, requestingUser?: User): void {
+    const list = this.getFinancialReminders();
+    list.unshift(item);
+    this.saveFinancialReminders(list);
+    const user = requestingUser || this.getCurrentUser();
+    this.addAuditLog(
+      'ثبت یادآوری مالی / چک / قسط',
+      'امور مالی',
+      `ثبت مورد جدید "${item.title}" با مبلغ ${formatCurrencyTomans(item.amount)} و سررسید ${item.dueDate} توسط ${user?.name || 'مدیر مالی'}.`
+    );
+  }
+
+  static updateFinancialReminder(item: FinancialReminder, requestingUser?: User): void {
+    const list = this.getFinancialReminders().map(r => r.id === item.id ? item : r);
+    this.saveFinancialReminders(list);
+    const user = requestingUser || this.getCurrentUser();
+    this.addAuditLog(
+      'ویرایش یادآوری مالی / چک',
+      'امور مالی',
+      `بروزرسانی "${item.title}" توسط ${user?.name || 'کاربر'}.`
+    );
+  }
+
+  static deleteFinancialReminder(id: string, requestingUser?: User): void {
+    const target = this.getFinancialReminders().find(r => r.id === id);
+    const list = this.getFinancialReminders().filter(r => r.id !== id);
+    this.saveFinancialReminders(list);
+    const user = requestingUser || this.getCurrentUser();
+    this.addAuditLog(
+      'حذف یادآوری مالی / چک',
+      'امور مالی',
+      `حذف مورد مالی "${target?.title || id}" توسط ${user?.name || 'کاربر'}.`
+    );
+  }
+
+  static sendFinancialReminderToAdmin(id: string): void {
+    const list = this.getFinancialReminders().map(r => {
+      if (r.id === id) {
+        return {
+          ...r,
+          isSentToSeniorAdmin: true,
+          sentAt: `${getTodayShamsi()} - ${getCurrentTimeStr()}`,
+        };
+      }
+      return r;
+    });
+    this.saveFinancialReminders(list);
+    const target = list.find(r => r.id === id);
+    this.addAuditLog(
+      'ارسال نوتیفیکیشن مالی به مدیر ارشد',
+      'امور مالی',
+      `نوتیفیکیشن و هشدار سررسید "${target?.title}" با موفقیت به کارتابل مدیر ارشد ارسال شد.`
+    );
+  }
+
+  static markFinancialReminderSeen(id: string, adminNotes?: string): void {
+    const list = this.getFinancialReminders().map(r => {
+      if (r.id === id) {
+        return {
+          ...r,
+          seenBySeniorAdmin: true,
+          seenAt: `${getTodayShamsi()} - ${getCurrentTimeStr()}`,
+          adminFeedback: adminNotes !== undefined ? adminNotes : r.adminFeedback,
+          status: r.status === 'PENDING' ? 'SEEN' : r.status
+        };
+      }
+      return r;
+    });
+    this.saveFinancialReminders(list);
+  }
+
+  static changeFinancialReminderStatus(id: string, status: FinancialReminderStatus, adminFeedback?: string): void {
+    const list = this.getFinancialReminders().map(r => {
+      if (r.id === id) {
+        return {
+          ...r,
+          status,
+          adminFeedback: adminFeedback !== undefined ? adminFeedback : r.adminFeedback,
+          seenBySeniorAdmin: true,
+          seenAt: r.seenAt || `${getTodayShamsi()} - ${getCurrentTimeStr()}`,
+          paidAt: status === 'PAID' ? `${getTodayShamsi()} - ${getCurrentTimeStr()}` : r.paidAt
+        };
+      }
+      return r;
+    });
+    this.saveFinancialReminders(list);
+    const target = list.find(r => r.id === id);
+    this.addAuditLog(
+      'تغییر وضعیت یادآوری مالی',
+      'امور مالی',
+      `وضعیت "${target?.title}" به ${status === 'PAID' ? 'پرداخت شده / تسویه' : status === 'APPROVED' ? 'تایید شده' : status} تغییر یافت.`
+    );
   }
 
   // ==========================================================
