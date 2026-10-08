@@ -560,7 +560,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <PWAInstallButton variant="primary" />
+                  <PWAInstallButton variant="primary" forceShow={true} />
                   <button
                     type="button"
                     onClick={() => PWAAlarmService.triggerTestNotification(currentUser?.employeeId)}

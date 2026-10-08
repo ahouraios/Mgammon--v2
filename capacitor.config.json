@@ -1,0 +1,13 @@
+{
+  "appId": "com.mgammon.workshop",
+  "appName": "سامانه کارگاهی M.GAMMON",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  }
+}
