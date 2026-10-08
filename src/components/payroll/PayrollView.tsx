@@ -834,7 +834,7 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
                   <div className="p-3.5 space-y-2.5">
                     {viewingPayslip.insuranceDeduction > 0 && (
                       <div className="flex justify-between py-1 border-b border-slate-100">
-                        <span className="text-slate-600">حق بیمه سهم کارمند (۷٪):</span>
+                        <span className="text-slate-600">حق بیمه سهم کارمند:</span>
                         <span className="font-mono text-rose-700">
                           {formatCurrencyTomans(viewingPayslip.insuranceDeduction)}
                         </span>

@@ -961,6 +961,12 @@ export class StorageService {
       }
     }
 
+    // Recalculate current month's salary so allowance/tax/insurance changes apply immediately
+    try {
+      const currentMonth = getTodayShamsi().substring(0, 7);
+      this.calculateSalaryForEmployee(emp.id, currentMonth);
+    } catch {}
+
     this.addAuditLog(
       'ویرایش مشخصات پرسنل',
       'پرسنل',
@@ -2826,15 +2832,46 @@ export class StorageService {
       .filter(m => m.employeeId === employeeId && m.deductFromSalary && (m.month?.replace(/-/g, '/') === normMonth || m.date?.replace(/-/g, '/').startsWith(normMonth)))
       .reduce((sum, m) => sum + m.amount, 0);
 
-    const housing = Number(settings.fixedHousingAllowance) > 0 ? Number(settings.fixedHousingAllowance) : 0;
-    const grocery = Number(settings.fixedGroceryAllowance) > 0 ? Number(settings.fixedGroceryAllowance) : 0;
-    const child = Number(settings.childAllowance) > 0 ? Number(settings.childAllowance) : 0;
+    // مزایای رفاهی و انگیزشی: اگر در فیلد پرسنل مشخص شده باشد (حتی صفر)، اولویت دارد؛ در غیر این صورت از تنظیمات سراسری کارگاه خوانده می‌شود
+    const housing = typeof emp.housingAllowance === 'number'
+      ? Math.max(0, emp.housingAllowance)
+      : (Number(settings.fixedHousingAllowance) > 0 ? Number(settings.fixedHousingAllowance) : 0);
+
+    const grocery = typeof emp.groceryAllowance === 'number'
+      ? Math.max(0, emp.groceryAllowance)
+      : (Number(settings.fixedGroceryAllowance) > 0 ? Number(settings.fixedGroceryAllowance) : 0);
+
+    const child = typeof emp.childAllowance === 'number'
+      ? Math.max(0, emp.childAllowance)
+      : (Number(settings.childAllowance) > 0 ? Number(settings.childAllowance) : 0);
 
     const grossSalary = emp.baseSalary + overtimeAmount + bonuses + housing + grocery + child + approvedHomeworkWagesToSalary;
-    const insuranceBase = emp.baseSalary + housing + grocery;
-    const insuranceDeduction = Math.round(insuranceBase * ((settings.insuranceRatePercent || 7) / 100));
-    const taxableBase = Math.max(0, grossSalary - (settings.taxExemptionThreshold || 14000000));
-    const taxDeduction = Math.round(taxableBase * ((settings.taxRatePercent || 10) / 100));
+
+    // کسورات قانونی: بیمه و مالیات (در صورت صفر بودن فیلد یا معافیت پرسنل، کسر نشده و مبلغ ۰ در فیش ثبت می‌شود)
+    let insuranceDeduction = 0;
+    const isInsuranceExempt = emp.isInsuranceExempt === true || emp.insuranceRatePercent === 0;
+    if (!isInsuranceExempt) {
+      const insuranceRate = typeof emp.insuranceRatePercent === 'number'
+        ? emp.insuranceRatePercent
+        : (settings.insuranceRatePercent || 7);
+      if (insuranceRate > 0) {
+        const insuranceBase = emp.baseSalary + housing + grocery;
+        insuranceDeduction = Math.round(insuranceBase * (insuranceRate / 100));
+      }
+    }
+
+    let taxDeduction = 0;
+    const isTaxExempt = emp.isTaxExempt === true || emp.taxRatePercent === 0;
+    if (!isTaxExempt) {
+      const taxRate = typeof emp.taxRatePercent === 'number'
+        ? emp.taxRatePercent
+        : (settings.taxRatePercent || 10);
+      if (taxRate > 0) {
+        const taxableBase = Math.max(0, grossSalary - (settings.taxExemptionThreshold || 14000000));
+        taxDeduction = Math.round(taxableBase * (taxRate / 100));
+      }
+    }
+
     const netSalary = Math.max(
       0,
       grossSalary - insuranceDeduction - taxDeduction - penalties - totalAdvances - miscDeductions + approvedExpensesToSalary

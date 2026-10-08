@@ -2088,15 +2088,45 @@ app.post('/api/salaries/calculate', requireRole('ADMIN', 'MANAGER'), (req: Reque
     .filter((m: any) => m.employeeId === emp.id && m.deductFromSalary && (m.month?.replace(/-/g, '/') === normMonth || m.date?.replace(/-/g, '/').startsWith(normMonth)))
     .reduce((sum: number, m: any) => sum + Number(m.amount || 0), 0);
 
-  const housing = db.settings.fixedHousingAllowance || 900000;
-  const grocery = db.settings.fixedGroceryAllowance || 1400000;
-  const child = db.settings.childAllowance || 0;
+  // مزایای رفاهی و انگیزشی: اولویت با مقادیر فیلد پرسنل است (حتی اگر صفر باشد)
+  const housing = typeof emp.housingAllowance === 'number'
+    ? Math.max(0, emp.housingAllowance)
+    : (db.settings.fixedHousingAllowance || 900000);
+
+  const grocery = typeof emp.groceryAllowance === 'number'
+    ? Math.max(0, emp.groceryAllowance)
+    : (db.settings.fixedGroceryAllowance || 1400000);
+
+  const child = typeof emp.childAllowance === 'number'
+    ? Math.max(0, emp.childAllowance)
+    : (db.settings.childAllowance || 0);
 
   const grossSalary = emp.baseSalary + overtimeAmount + bonuses + housing + grocery + child;
-  const insuranceBase = emp.baseSalary + housing + grocery;
-  const insuranceDeduction = Math.round(insuranceBase * ((db.settings.insuranceRatePercent || 7) / 100));
-  const taxable = Math.max(0, grossSalary - (db.settings.taxExemptionThreshold || 14000000));
-  const taxDeduction = Math.round(taxable * ((db.settings.taxRatePercent || 10) / 100));
+
+  // کسورات قانونی: بیمه و مالیات (در صورت صفر بودن فیلد یا معافیت پرسنل، کسر نشده و مبلغ ۰ ثبت می‌شود)
+  let insuranceDeduction = 0;
+  const isInsuranceExempt = emp.isInsuranceExempt === true || emp.insuranceRatePercent === 0;
+  if (!isInsuranceExempt) {
+    const insuranceRate = typeof emp.insuranceRatePercent === 'number'
+      ? emp.insuranceRatePercent
+      : (db.settings.insuranceRatePercent || 7);
+    if (insuranceRate > 0) {
+      const insuranceBase = emp.baseSalary + housing + grocery;
+      insuranceDeduction = Math.round(insuranceBase * (insuranceRate / 100));
+    }
+  }
+
+  let taxDeduction = 0;
+  const isTaxExempt = emp.isTaxExempt === true || emp.taxRatePercent === 0;
+  if (!isTaxExempt) {
+    const taxRate = typeof emp.taxRatePercent === 'number'
+      ? emp.taxRatePercent
+      : (db.settings.taxRatePercent || 10);
+    if (taxRate > 0) {
+      const taxable = Math.max(0, grossSalary - (db.settings.taxExemptionThreshold || 14000000));
+      taxDeduction = Math.round(taxable * (taxRate / 100));
+    }
+  }
 
   const netSalary = Math.max(
     0,

@@ -37,7 +37,8 @@ import {
   UserCheck,
   Briefcase,
   Landmark,
-  Receipt
+  Receipt,
+  Coins
 } from 'lucide-react';
 import { Employee, Shift, User as AppUser, PERMISSION_LEVELS, MANAGEMENT_ROLES, ManagementRole } from '../../types';
 import {
@@ -190,9 +191,22 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     allowManualAttendance: false,
     isHrManager: false,
     isFinanceManager: false,
+    housingAllowance: undefined,
+    groceryAllowance: undefined,
+    childAllowance: undefined,
+    isInsuranceExempt: false,
+    insuranceRatePercent: undefined,
+    isTaxExempt: false,
+    taxRatePercent: undefined,
   };
 
   const [formData, setFormData] = useState<Omit<Employee, 'id' | 'companyId'>>(defaultFormData);
+  const [housingInput, setHousingInput] = useState<string>('');
+  const [groceryInput, setGroceryInput] = useState<string>('');
+  const [childInput, setChildInput] = useState<string>('');
+  const [insuranceRateInput, setInsuranceRateInput] = useState<string>('');
+  const [taxRateInput, setTaxRateInput] = useState<string>('');
+  const [showCompensationOverrides, setShowCompensationOverrides] = useState<boolean>(false);
   const [featureFilter, setFeatureFilter] = useState<'ALL' | 'HOMEWORK' | 'MANUAL_ATTENDANCE' | 'HR_MANAGERS' | 'FINANCE_MANAGERS'>('ALL');
 
   const departments = ['ALL', ...Array.from(new Set([...categories, ...employees.map((e) => e.department)]))];
@@ -233,6 +247,12 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     const initialBaseSalary = 28000000;
     setSalaryInput(initialBaseSalary.toLocaleString('en-US'));
     setCardInput('');
+    setHousingInput('');
+    setGroceryInput('');
+    setChildInput('');
+    setInsuranceRateInput('');
+    setTaxRateInput('');
+    setShowCompensationOverrides(false);
     setFormData({
       ...defaultFormData,
       personalCode: getNextPersonalCode(),
@@ -257,6 +277,13 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
       allowManualAttendance: false,
       isHrManager: false,
       isFinanceManager: false,
+      housingAllowance: undefined,
+      groceryAllowance: undefined,
+      childAllowance: undefined,
+      isInsuranceExempt: false,
+      insuranceRatePercent: undefined,
+      isTaxExempt: false,
+      taxRatePercent: undefined,
     });
     setIsFormModalOpen(true);
   };
@@ -268,6 +295,20 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     setShowPassword(false);
     setSalaryInput(emp.baseSalary ? emp.baseSalary.toLocaleString('en-US') : '');
     setCardInput(emp.cardNumber ? formatCardNumber(emp.cardNumber) : '');
+    setHousingInput(emp.housingAllowance !== undefined ? emp.housingAllowance.toLocaleString('en-US') : '');
+    setGroceryInput(emp.groceryAllowance !== undefined ? emp.groceryAllowance.toLocaleString('en-US') : '');
+    setChildInput(emp.childAllowance !== undefined ? emp.childAllowance.toLocaleString('en-US') : '');
+    setInsuranceRateInput(emp.insuranceRatePercent !== undefined ? String(emp.insuranceRatePercent) : '');
+    setTaxRateInput(emp.taxRatePercent !== undefined ? String(emp.taxRatePercent) : '');
+    setShowCompensationOverrides(
+      emp.housingAllowance !== undefined ||
+      emp.groceryAllowance !== undefined ||
+      emp.childAllowance !== undefined ||
+      Boolean(emp.isInsuranceExempt) ||
+      Boolean(emp.isTaxExempt) ||
+      emp.insuranceRatePercent !== undefined ||
+      emp.taxRatePercent !== undefined
+    );
     setFormData({
       personalCode: emp.personalCode,
       firstName: emp.firstName,
@@ -305,6 +346,13 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
       allowManualAttendance: Boolean(emp.allowManualAttendance),
       isHrManager: Boolean(emp.isHrManager),
       isFinanceManager: Boolean(emp.isFinanceManager),
+      housingAllowance: emp.housingAllowance,
+      groceryAllowance: emp.groceryAllowance,
+      childAllowance: emp.childAllowance,
+      isInsuranceExempt: Boolean(emp.isInsuranceExempt),
+      insuranceRatePercent: emp.insuranceRatePercent,
+      isTaxExempt: Boolean(emp.isTaxExempt),
+      taxRatePercent: emp.taxRatePercent,
     });
     setIsFormModalOpen(true);
   };
@@ -1426,6 +1474,46 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                     </p>
                   </div>
                 )}
+
+                {(viewingProfile.housingAllowance !== undefined ||
+                  viewingProfile.groceryAllowance !== undefined ||
+                  viewingProfile.childAllowance !== undefined ||
+                  viewingProfile.isInsuranceExempt ||
+                  viewingProfile.isTaxExempt) && (
+                  <div className="mt-3 pt-3 border-t border-slate-200 -mx-4 -mb-4 p-3 bg-slate-50 text-xs space-y-1.5 rounded-b-xl">
+                    <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <Coins className="w-4 h-4 text-indigo-600" />
+                      <span>وضعیت اختصاصی مزایا و معافیت‌های قانونی:</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {viewingProfile.housingAllowance === 0 && (
+                        <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 text-[10px] font-bold">
+                          حق مسکن: ۰ (حذف از فیش)
+                        </span>
+                      )}
+                      {viewingProfile.groceryAllowance === 0 && (
+                        <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 text-[10px] font-bold">
+                          بن خواروبار: ۰ (حذف از فیش)
+                        </span>
+                      )}
+                      {viewingProfile.childAllowance === 0 && (
+                        <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 text-[10px] font-bold">
+                          حق اولاد: ۰ (حذف از فیش)
+                        </span>
+                      )}
+                      {viewingProfile.isInsuranceExempt && (
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                          معاف از بیمه (بیمه = ۰)
+                        </span>
+                      )}
+                      {viewingProfile.isTaxExempt && (
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                          معاف از مالیات (مالیات = ۰)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
@@ -2302,6 +2390,230 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                     required
                   />
                 </div>
+              </div>
+
+              {/* بخش اختصاصی: تنظیمات مزایا، بیمه و مالیات (در صورت صفر بودن، از محاسبات و فیش حذف می‌شود) */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Coins className="w-4 h-4 text-indigo-600" />
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800">
+                        تنظیمات اختصاصی مزایا، بیمه و مالیات این پرسنل
+                      </h4>
+                      <p className="text-[10px] text-slate-500">
+                        در صورت وارد کردن عدد <strong>۰</strong> یا انتخاب معافیت، این موارد <strong>نه در محاسبات حقوق لحاظ می‌شوند و نه در فیش حقوقی نمایش داده می‌شوند.</strong>
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowCompensationOverrides(!showCompensationOverrides)}
+                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                  >
+                    {showCompensationOverrides ? 'بستن تنظیمات' : 'تنظیم مزایا و کسورات'}
+                  </button>
+                </div>
+
+                {showCompensationOverrides && (
+                  <div className="pt-2 border-t border-slate-200 space-y-3 animate-in fade-in duration-150">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {/* حق مسکن */}
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-700 mb-1">
+                          حق مسکن (تومان):
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={housingInput}
+                          placeholder={`پیش‌فرض (${(settings.fixedHousingAllowance || 0).toLocaleString('en-US')})`}
+                          onChange={(e) => {
+                            const raw = toEnglishDigits(e.target.value).replace(/\D/g, '');
+                            if (raw === '') {
+                              setHousingInput('');
+                              setFormData(prev => ({ ...prev, housingAllowance: undefined }));
+                            } else {
+                              const num = parseInt(raw, 10);
+                              setHousingInput(num.toLocaleString('en-US'));
+                              setFormData(prev => ({ ...prev, housingAllowance: num }));
+                            }
+                          }}
+                          className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-indigo-500 font-mono text-left"
+                          dir="ltr"
+                        />
+                        <span className="text-[10px] text-slate-400 mt-0.5 block">
+                          برای حذف از فیش: ۰ وارد کنید
+                        </span>
+                      </div>
+
+                      {/* بن خواروبار */}
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-700 mb-1">
+                          بن خواروبار (تومان):
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={groceryInput}
+                          placeholder={`پیش‌فرض (${(settings.fixedGroceryAllowance || 0).toLocaleString('en-US')})`}
+                          onChange={(e) => {
+                            const raw = toEnglishDigits(e.target.value).replace(/\D/g, '');
+                            if (raw === '') {
+                              setGroceryInput('');
+                              setFormData(prev => ({ ...prev, groceryAllowance: undefined }));
+                            } else {
+                              const num = parseInt(raw, 10);
+                              setGroceryInput(num.toLocaleString('en-US'));
+                              setFormData(prev => ({ ...prev, groceryAllowance: num }));
+                            }
+                          }}
+                          className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-indigo-500 font-mono text-left"
+                          dir="ltr"
+                        />
+                        <span className="text-[10px] text-slate-400 mt-0.5 block">
+                          برای حذف از فیش: ۰ وارد کنید
+                        </span>
+                      </div>
+
+                      {/* حق اولاد */}
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-700 mb-1">
+                          حق اولاد (تومان):
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={childInput}
+                          placeholder={`پیش‌فرض (${(settings.childAllowance || 0).toLocaleString('en-US')})`}
+                          onChange={(e) => {
+                            const raw = toEnglishDigits(e.target.value).replace(/\D/g, '');
+                            if (raw === '') {
+                              setChildInput('');
+                              setFormData(prev => ({ ...prev, childAllowance: undefined }));
+                            } else {
+                              const num = parseInt(raw, 10);
+                              setChildInput(num.toLocaleString('en-US'));
+                              setFormData(prev => ({ ...prev, childAllowance: num }));
+                            }
+                          }}
+                          className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-indigo-500 font-mono text-left"
+                          dir="ltr"
+                        />
+                        <span className="text-[10px] text-slate-400 mt-0.5 block">
+                          برای حذف از فیش: ۰ وارد کنید
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* ردیف بیمه و مالیات */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200/80">
+                      {/* بیمه */}
+                      <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-slate-800">بیمه تأمین اجتماعی</label>
+                          <label className="flex items-center gap-1.5 text-[11px] font-medium text-rose-600 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(formData.isInsuranceExempt)}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setFormData(prev => ({
+                                  ...prev,
+                                  isInsuranceExempt: checked,
+                                  insuranceRatePercent: checked ? 0 : prev.insuranceRatePercent
+                                }));
+                              }}
+                              className="rounded text-rose-600 focus:ring-rose-500"
+                            />
+                            <span>معاف از بیمه (بیمه = ۰)</span>
+                          </label>
+                        </div>
+                        {!formData.isInsuranceExempt && (
+                          <div>
+                            <label className="block text-[10px] text-slate-500 mb-1">
+                              درصد سهم کارگر (پیش‌فرض کارگاه: {settings.insuranceRatePercent || 7}٪):
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="30"
+                              value={insuranceRateInput}
+                              placeholder={`${settings.insuranceRatePercent || 7}٪`}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setInsuranceRateInput(val);
+                                setFormData(prev => ({
+                                  ...prev,
+                                  insuranceRatePercent: val === '' ? undefined : Number(val)
+                                }));
+                              }}
+                              className="w-full text-xs p-1.5 rounded-lg border border-slate-200 font-mono text-left"
+                              dir="ltr"
+                            />
+                          </div>
+                        )}
+                        {formData.isInsuranceExempt && (
+                          <div className="text-[10px] text-rose-700 font-medium bg-rose-50 p-1.5 rounded">
+                            ✓ بیمه این پرسنل صفر محاسبه شده و از فیش حقوقی حذف می‌گردد.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* مالیات */}
+                      <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-slate-800">مالیات حقوق</label>
+                          <label className="flex items-center gap-1.5 text-[11px] font-medium text-rose-600 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(formData.isTaxExempt)}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setFormData(prev => ({
+                                  ...prev,
+                                  isTaxExempt: checked,
+                                  taxRatePercent: checked ? 0 : prev.taxRatePercent
+                                }));
+                              }}
+                              className="rounded text-rose-600 focus:ring-rose-500"
+                            />
+                            <span>معاف از مالیات (مالیات = ۰)</span>
+                          </label>
+                        </div>
+                        {!formData.isTaxExempt && (
+                          <div>
+                            <label className="block text-[10px] text-slate-500 mb-1">
+                              درصد مالیات (پیش‌فرض کارگاه: {settings.taxRatePercent || 10}٪):
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="35"
+                              value={taxRateInput}
+                              placeholder={`${settings.taxRatePercent || 10}٪`}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setTaxRateInput(val);
+                                setFormData(prev => ({
+                                  ...prev,
+                                  taxRatePercent: val === '' ? undefined : Number(val)
+                                }));
+                              }}
+                              className="w-full text-xs p-1.5 rounded-lg border border-slate-200 font-mono text-left"
+                              dir="ltr"
+                            />
+                          </div>
+                        )}
+                        {formData.isTaxExempt && (
+                          <div className="text-[10px] text-rose-700 font-medium bg-rose-50 p-1.5 rounded">
+                            ✓ مالیات این پرسنل صفر محاسبه شده و از فیش حقوقی حذف می‌گردد.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {formError && (

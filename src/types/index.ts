@@ -154,6 +154,14 @@ export interface Employee {
   allowManualAttendance?: boolean; // مجاز به ثبت تردد مستقیم دستی (بدون نیاز به اسکن بارکد/QR)
   isHrManager?: boolean; // مدیر منابع انسانی (تخصیص خودکار دسترسی‌های پرسنلی و شیفت)
   isFinanceManager?: boolean; // مدیر منابع مالی (تخصیص خودکار دسترسی‌های مالی، حقوق و صورتحساب/چک)
+  // مزایا و کسورات اختصاصی پرسنل (در صورت صفر بودن، نه در محاسبات لحاظ شده و نه در فیش نمایش داده می‌شود)
+  housingAllowance?: number; // حق مسکن اختصاصی (۰ = بدون حق مسکن و حذف از فیش)
+  groceryAllowance?: number; // بن خواروبار اختصاصی (۰ = بدون بن خواروبار و حذف از فیش)
+  childAllowance?: number; // حق اولاد اختصاصی (۰ = بدون حق اولاد و حذف از فیش)
+  isInsuranceExempt?: boolean; // معافیت کامل از بیمه (بیمه = ۰ و عدم نمایش در فیش)
+  insuranceRatePercent?: number; // درصد اختصاصی بیمه سهم کارگر (۰ = عدم کسر بیمه)
+  isTaxExempt?: boolean; // معافیت کامل از مالیات (مالیات = ۰ و عدم نمایش در فیش)
+  taxRatePercent?: number; // درصد اختصاصی مالیات حقوق (۰ = عدم کسر مالیات)
 }
 
 export interface Shift {
