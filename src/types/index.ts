@@ -373,6 +373,18 @@ export interface SalaryRecord {
   netSalary: number;
   status: 'DRAFT' | 'CALCULATED' | 'PAID';
   paymentDate?: string;
+  // Audit and attendance transparency breakdown
+  absentDaysCount?: number;
+  presentDaysCount?: number;
+  missionDaysCount?: number;
+  paidLeaveDaysCount?: number;
+  unpaidLeaveDaysCount?: number;
+  explicitAbsentDaysCount?: number;
+  unrecordedDaysCount?: number;
+  incompleteDaysCount?: number;
+  dailyBaseWage?: number;
+  effectiveHourlyRate?: number;
+  absentDeduction?: number;
 }
 
 export interface AuditLog {

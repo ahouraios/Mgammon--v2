@@ -37,6 +37,7 @@ import {
   initialFinancialReminders
 } from '../data/initialData';
 import { getCurrentTimeStr, getTodayShamsi, calculateGpsDistanceMeters, formatCurrencyTomans, getDatesBetweenShamsi, toEnglishDigits, formatCardNumber } from '../utils/dateUtils';
+import { calculatePayroll } from '../utils/payrollEngine';
 
 const STORAGE_KEYS = {
   SETTINGS: 'mgommon_company_settings_v4',
@@ -2752,157 +2753,24 @@ export class StorageService {
     const attendance = this.getAllAttendanceRaw();
     const advances = this.getAllAdvanceRequestsRaw();
     const bonusesPenalties = getItem<BonusOrPenalty[]>(STORAGE_KEYS.BONUSES, initialBonusesPenalties);
+    const workerExpenses = this.getAllExpensesRaw();
+    const homeworkTasks = this.getAllHomeworkTasksRaw();
+    const miscPayments = this.getAllMiscPaymentsRaw();
+    const missions = this.getAllWorkMissionsRaw();
 
-    let workedDaysCount = 0;
-    let totalWorkedMinutes = 0;
-    let totalOvertimeMins = 0;
-
-    const monthlyAtt = attendance.filter(a => a.employeeId === employeeId && a.date.startsWith(month));
-
-    monthlyAtt.forEach(a => {
-      // Include worked days and paid approved leave (ON_LEAVE)
-      if (a.status === 'PRESENT' || a.status === 'LATE' || a.status === 'EARLY_LEAVE' || a.status === 'ON_LEAVE') {
-        workedDaysCount++;
-        const dayMins = a.status === 'ON_LEAVE'
-          ? ((settings.dailyWorkHours || 8) * 60)
-          : (typeof a.workDurationMinutes === 'number' && a.workDurationMinutes > 0
-              ? a.workDurationMinutes
-              : 0);
-        totalWorkedMinutes += dayMins;
-        totalOvertimeMins += (a.overtimeMinutes || 0);
-      }
-    });
-
-    if (monthlyAtt.length === 0) {
-      workedDaysCount = settings.workDaysPerMonth || 22;
-      totalWorkedMinutes = workedDaysCount * (settings.dailyWorkHours || 8) * 60;
-    }
-
-    // Explicit absent days deduction
-    const absentDaysCount = monthlyAtt.filter(a => a.status === 'ABSENT').length;
-    const dailyBaseWage = Math.round(emp.baseSalary / (settings.workDaysPerMonth || 22));
-    const absentDeduction = absentDaysCount * dailyBaseWage;
-
-    // Effective hourly rate: if emp.hourlyRate is 0, compute from baseSalary / (workDays * dailyHours)
-    const standardDailyHours = settings.dailyWorkHours || 8;
-    const effectiveHourlyRate = emp.hourlyRate > 0
-      ? emp.hourlyRate
-      : Math.round(emp.baseSalary / ((settings.workDaysPerMonth || 22) * standardDailyHours));
-
-    // Exact minute-based calculations (Fixes PAY-001 & PAY-003)
-    const workedHours = Number((totalWorkedMinutes / 60).toFixed(2));
-    const overtimeHours = Number((totalOvertimeMins / 60).toFixed(2));
-    const overtimeMultiplier = settings.overtimeRateMultiplier || emp.overtimeRate || 1.4;
-    const overtimeAmount = Math.round((totalOvertimeMins / 60) * effectiveHourlyRate * overtimeMultiplier);
-
-    const normMonth = month.replace(/-/g, '/');
-
-    const approvedAdvances = advances
-      .filter(a => a.employeeId === employeeId && a.status === 'APPROVED' && (a.repayMonth?.replace(/-/g, '/') === normMonth))
-      .reduce((sum, a) => sum + a.amount, 0);
-
-    const discretionaryAdvances = bonusesPenalties
-      .filter(b => b.employeeId === employeeId && (b.type === 'DISCRETIONARY_ADVANCE' || (b as any).type === 'EXTRA_ADVANCE') && (b.month?.replace(/-/g, '/') === normMonth))
-      .reduce((sum, b) => sum + b.amount, 0);
-
-    const totalAdvances = approvedAdvances + discretionaryAdvances;
-
-    const bonuses = bonusesPenalties
-      .filter(b => b.employeeId === employeeId && b.type === 'BONUS' && (b.month?.replace(/-/g, '/') === normMonth))
-      .reduce((sum, b) => sum + b.amount, 0);
-
-    const disciplinaryPenalties = bonusesPenalties
-      .filter(b => b.employeeId === employeeId && b.type === 'PENALTY' && (b.month?.replace(/-/g, '/') === normMonth))
-      .reduce((sum, b) => sum + b.amount, 0);
-
-    const penalties = disciplinaryPenalties + absentDeduction;
-
-    // هزینه پرداخت‌شده از کارت شخصی کارگر که مدیر گزینه «افزودن به حقوق» را انتخاب کرده است
-    const approvedExpensesToSalary = this.getAllExpensesRaw()
-      .filter(e => e.employeeId === employeeId && e.status === 'ADDED_TO_SALARY' && (e.date?.startsWith(month) || e.date?.replace(/-/g, '/').startsWith(normMonth)))
-      .reduce((sum, e) => sum + e.amount, 0);
-
-    // دستمزد کار در منزل و کارمزدی تایید شده که گزینه «افزودن به حقوق دوره جاری» انتخاب شده است (بدون اثر بر پایه حقوق)
-    const approvedHomeworkWagesToSalary = this.getAllHomeworkTasksRaw()
-      .filter(h => h.employeeId === employeeId && h.status === 'ADDED_TO_SALARY' && (h.date?.startsWith(month) || h.date?.replace(/-/g, '/').startsWith(normMonth)))
-      .reduce((sum, h) => sum + h.totalWage, 0);
-
-    // پرداخت‌های متفرقه و علی‌الحساب که گزینه «از حقوق کسر شود» انتخاب شده است
-    const miscDeductions = this.getAllMiscPaymentsRaw()
-      .filter(m => m.employeeId === employeeId && m.deductFromSalary && (m.month?.replace(/-/g, '/') === normMonth || m.date?.replace(/-/g, '/').startsWith(normMonth)))
-      .reduce((sum, m) => sum + m.amount, 0);
-
-    // مزایای رفاهی و انگیزشی: اگر در فیلد پرسنل مشخص شده باشد (حتی صفر)، اولویت دارد؛ در غیر این صورت از تنظیمات سراسری کارگاه خوانده می‌شود
-    const housing = typeof emp.housingAllowance === 'number'
-      ? Math.max(0, emp.housingAllowance)
-      : (Number(settings.fixedHousingAllowance) > 0 ? Number(settings.fixedHousingAllowance) : 0);
-
-    const grocery = typeof emp.groceryAllowance === 'number'
-      ? Math.max(0, emp.groceryAllowance)
-      : (Number(settings.fixedGroceryAllowance) > 0 ? Number(settings.fixedGroceryAllowance) : 0);
-
-    const child = typeof emp.childAllowance === 'number'
-      ? Math.max(0, emp.childAllowance)
-      : (Number(settings.childAllowance) > 0 ? Number(settings.childAllowance) : 0);
-
-    const grossSalary = emp.baseSalary + overtimeAmount + bonuses + housing + grocery + child + approvedHomeworkWagesToSalary;
-
-    // کسورات قانونی: بیمه و مالیات (در صورت صفر بودن فیلد یا معافیت پرسنل، کسر نشده و مبلغ ۰ در فیش ثبت می‌شود)
-    let insuranceDeduction = 0;
-    const isInsuranceExempt = emp.isInsuranceExempt === true || emp.insuranceRatePercent === 0;
-    if (!isInsuranceExempt) {
-      const insuranceRate = typeof emp.insuranceRatePercent === 'number'
-        ? emp.insuranceRatePercent
-        : (settings.insuranceRatePercent || 7);
-      if (insuranceRate > 0) {
-        const insuranceBase = emp.baseSalary + housing + grocery;
-        insuranceDeduction = Math.round(insuranceBase * (insuranceRate / 100));
-      }
-    }
-
-    let taxDeduction = 0;
-    const isTaxExempt = emp.isTaxExempt === true || emp.taxRatePercent === 0;
-    if (!isTaxExempt) {
-      const taxRate = typeof emp.taxRatePercent === 'number'
-        ? emp.taxRatePercent
-        : (settings.taxRatePercent || 10);
-      if (taxRate > 0) {
-        const taxableBase = Math.max(0, grossSalary - (settings.taxExemptionThreshold || 14000000));
-        taxDeduction = Math.round(taxableBase * (taxRate / 100));
-      }
-    }
-
-    const netSalary = Math.max(
-      0,
-      grossSalary - insuranceDeduction - taxDeduction - penalties - totalAdvances - miscDeductions + approvedExpensesToSalary
-    );
-
-    const record: SalaryRecord = {
-      id: existing ? existing.id : `sal_${emp.id}_${month.replace('/', '_')}`,
-      companyId: settings.id,
-      employeeId: emp.id,
+    const record = calculatePayroll({
+      employee: emp,
+      settings,
       month,
-      baseSalary: emp.baseSalary,
-      workDays: workedDaysCount,
-      workedHours,
-      overtimeHours,
-      overtimeAmount,
-      bonusesTotal: bonuses,
-      penaltiesTotal: penalties,
-      advancesTotal: totalAdvances,
-      discretionaryAdvancesTotal: discretionaryAdvances,
-      personalCardExpensesTotal: approvedExpensesToSalary,
-      homeworkWagesTotal: approvedHomeworkWagesToSalary,
-      miscDeductionsTotal: miscDeductions,
-      housingAllowance: housing,
-      groceryAllowance: grocery,
-      childAllowance: child,
-      grossSalary,
-      insuranceDeduction,
-      taxDeduction,
-      netSalary,
-      status: 'CALCULATED',
-    };
+      attendanceRecords: attendance,
+      advances,
+      bonusesPenalties,
+      workerExpenses,
+      homeworkTasks,
+      miscPayments,
+      missions,
+      existingRecord: existing
+    });
 
     // ALWAYS write to raw salaries list (Fixes PAY-006)
     const idx = rawSalaries.findIndex(s => s.employeeId === employeeId && s.month === month);

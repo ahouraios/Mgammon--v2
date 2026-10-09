@@ -599,8 +599,8 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
               ) : (
                 filteredSalaries.map((sal) => {
                   const emp = employees.find((e) => e.id === sal.employeeId);
-                  const allowances = (sal.housingAllowance || 0) + (sal.groceryAllowance || 0) + (sal.bonusesTotal || 0);
-                  const statutoryDeductions = (sal.insuranceDeduction || 0) + (sal.taxDeduction || 0) + (sal.penaltiesTotal || 0);
+                  const allowances = (sal.housingAllowance || 0) + (sal.groceryAllowance || 0) + (sal.childAllowance || 0) + (sal.bonusesTotal || 0) + (sal.homeworkWagesTotal || 0);
+                  const statutoryDeductions = (sal.insuranceDeduction || 0) + (sal.taxDeduction || 0) + (sal.penaltiesTotal || 0) + (sal.miscDeductionsTotal || 0);
                   return (
                     <tr key={sal.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3 px-4 font-bold text-slate-900">
@@ -740,6 +740,11 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
                   <span className="font-bold text-slate-900">
                     {viewingPayslip.workDays} روز ({viewingPayslip.workedHours} ساعت)
                   </span>
+                  {typeof viewingPayslip.absentDaysCount === 'number' && viewingPayslip.absentDaysCount > 0 && (
+                    <span className="text-[10px] text-rose-600 block mt-0.5 font-medium">
+                      (غیبت کسر شده: {viewingPayslip.absentDaysCount} روز)
+                    </span>
+                  )}
                 </div>
               </div>
 

@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import webpush from 'web-push';
 import { gregorianToJalali, getDatesBetweenShamsi } from './src/utils/dateUtils';
+import { calculatePayroll } from './src/utils/payrollEngine';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -176,6 +177,7 @@ interface DatabaseSchema {
   missions?: any[];
   salaries: any[];
   bonusesPenalties?: any[];
+  homeworkTasks?: any[];
   auditLogs: any[];
   messages: any[];
   alarms?: any[];
@@ -305,6 +307,7 @@ function loadInitialDb(): DatabaseSchema {
     missions: [],
     salaries: [],
     bonusesPenalties: [],
+    homeworkTasks: [],
     auditLogs: [
       {
         id: 'log_launch',
@@ -1152,12 +1155,20 @@ app.post('/api/attendance/manual-request', requireAuth, (req: Request, res: Resp
     targetEmployeeId = user.employeeId;
   }
 
-  if (!targetEmployeeId || !date || !reason) {
-    return res.status(400).json({ success: false, message: 'تاریخ، پرسنل و علت ثبت دستی الزامی است.' });
+  if (!targetEmployeeId || !date || !reason || !reason.trim()) {
+    return res.status(400).json({ success: false, message: 'تاریخ، پرسنل و علت/توضیح ثبت دستی الزامی است.' });
   }
 
   const employee = db.employees.find(e => e.id === targetEmployeeId);
   if (!employee) return res.status(404).json({ success: false, message: 'پرسنل یافت نشد.' });
+
+  // Backend authorization check: Only allowed if allowManualAttendance is enabled for this employee, or performed by ADMIN/MANAGER
+  if (user.role === 'EMPLOYEE' && !employee.allowManualAttendance) {
+    return res.status(403).json({
+      success: false,
+      message: 'ثبت تردد دستی برای این حساب کاربری توسط مدیریت غیرفعال شده است. لطفاً از طریق اسکن بارکد در کارگاه تردد خود را ثبت کنید.'
+    });
+  }
 
   const shift = db.shifts.find((s: any) => s.id === employee.shiftId) || db.shifts[0];
   let workDurationMinutes = 480;
@@ -1173,6 +1184,9 @@ app.post('/api/attendance/manual-request', requireAuth, (req: Request, res: Resp
     }
   }
 
+  const isDirectManagerEntry = user.role === 'ADMIN' || user.role === 'MANAGER';
+  const approvalStatus = isDirectManagerEntry ? 'APPROVED' : 'PENDING';
+
   const newRecord = {
     id: `att_man_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
     employeeId: targetEmployeeId,
@@ -1184,20 +1198,33 @@ app.post('/api/attendance/manual-request', requireAuth, (req: Request, res: Resp
     earlyExitMinutes: 0,
     overtimeMinutes: 0,
     status: 'PRESENT',
-    approvalStatus: 'PENDING', // PENDING for manager review!
+    approvalStatus, // PENDING for employee review, APPROVED if registered by Manager
     checkInMethod: 'MANUAL',
     checkOutMethod: 'MANUAL',
-    notes: `درخواست ثبت دستی توسط ${user.name}: ${reason}`
+    notes: `ثبت تردد دستی توسط ${user.name}: ${reason.trim()}`
   };
 
   db.attendance.push(newRecord);
+
+  const clientIp = (req.ip || req.headers['x-forwarded-for'] || '127.0.0.1').toString();
+  logServerAudit(
+    user.id,
+    user.name || `${employee.firstName} ${employee.lastName}`,
+    isDirectManagerEntry ? 'ثبت مستقیم تردد دستی' : 'درخواست ثبت تردد دستی',
+    'حضور و غیاب',
+    `ثبت تردد دستی (${date}) برای ${employee.firstName} ${employee.lastName} به علت: ${reason.trim()} [وضعیت: ${approvalStatus}]`,
+    clientIp
+  );
+
   if (!persistDb()) {
     return res.status(500).json({ success: false, message: 'خطا در ذخیره‌سازی داده در سرور' });
   }
 
   res.json({
     success: true,
-    message: 'درخواست ثبت تردد دستی با موفقیت ثبت شد و در انتظار تایید مدیریت است.',
+    message: isDirectManagerEntry
+      ? 'تردد دستی با موفقیت در پایگاه‌داده ثبت شد.'
+      : 'درخواست ثبت تردد دستی با موفقیت ارسال شد و در انتظار تأیید مدیریت کارگاه است.',
     record: newRecord
   });
 });
@@ -1951,6 +1978,108 @@ app.delete('/api/missions/:id', (req: Request, res: Response) => {
   res.json({ success: true, message: 'مأموریت کاری با موفقیت حذف شد.' });
 });
 
+// 12.5. Homework & Piecework Tasks (کار در منزل و کارمزدی)
+app.get('/api/homework-tasks', (req: Request, res: Response) => {
+  const user = (req as any).user;
+  if (!db.homeworkTasks) db.homeworkTasks = [];
+  if (user && user.role === 'EMPLOYEE' && user.employeeId) {
+    return res.json(db.homeworkTasks.filter((t: any) => t.employeeId === user.employeeId));
+  }
+  res.json(db.homeworkTasks);
+});
+
+app.post('/api/homework-tasks', requireAuth, (req: Request, res: Response) => {
+  const user = (req as any).user;
+  const data = req.body;
+  if (!db.homeworkTasks) db.homeworkTasks = [];
+
+  let employeeId = data.employeeId;
+  if (user.role === 'EMPLOYEE') {
+    employeeId = user.employeeId;
+  }
+  if (!employeeId || !data.taskType?.trim()) {
+    return res.status(400).json({ success: false, message: 'اطلاعات پرسنل و نوع کار انجام‌شده الزامی است.' });
+  }
+
+  const qty = Number(data.quantity);
+  const rate = Number(data.wagePerUnit);
+  if (isNaN(qty) || qty <= 0 || isNaN(rate) || rate < 0) {
+    return res.status(400).json({ success: false, message: 'تعداد یا نرخ دستمزد نامعتبر است.' });
+  }
+
+  const emp = db.employees.find(e => e.id === employeeId);
+  const employeeName = emp ? `${emp.firstName} ${emp.lastName}` : (user.name || 'پرسنل');
+  const totalWage = Math.round(qty * rate);
+
+  const newTask = {
+    id: data.id || `hw_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    companyId: db.settings.id,
+    employeeId,
+    employeeName,
+    taskType: data.taskType.trim(),
+    quantity: qty,
+    unit: data.unit || 'عدد',
+    wagePerUnit: rate,
+    totalWage,
+    date: data.date || getTehranDateTime().dateStr,
+    orderOrBatchCode: (data.orderCode || data.orderOrBatchCode)?.trim(),
+    orderCode: (data.orderCode || data.orderOrBatchCode)?.trim(),
+    notes: data.notes?.trim(),
+    receiptOrProofUrl: data.proofImageUrl || data.receiptOrProofUrl,
+    proofImageUrl: data.proofImageUrl || data.receiptOrProofUrl,
+    status: 'PENDING',
+    createdAt: new Date().toISOString()
+  };
+
+  db.homeworkTasks.unshift(newTask);
+  persistDb();
+  res.json({ success: true, message: 'گزارش کار در منزل با موفقیت ثبت شد.', task: newTask });
+});
+
+app.post('/api/homework-tasks/review', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+  const reviewer = (req as any).user;
+  const { id, action, notes } = req.body;
+  if (!db.homeworkTasks) db.homeworkTasks = [];
+  const target = db.homeworkTasks.find((t: any) => t.id === id);
+  if (!target) return res.status(404).json({ success: false, message: 'مورد کار در منزل یافت نشد.' });
+
+  if (action === 'SETTLE_NOW') {
+    target.status = 'SETTLED';
+    target.settlementType = 'IMMEDIATE';
+    target.settlementNotes = notes || 'تسویه مستقیم نقدی';
+  } else if (action === 'ADD_TO_SALARY') {
+    target.status = 'ADDED_TO_SALARY';
+    target.settlementType = 'SALARY';
+    target.settlementNotes = notes || 'افزوده‌شده به فیش حقوقی';
+  } else if (action === 'REJECT') {
+    target.status = 'REJECTED';
+    target.settlementType = 'REJECTED';
+    target.rejectionReason = notes || 'رد شده توسط مدیریت';
+  }
+  target.settledAt = new Date().toISOString();
+  target.settledBy = reviewer.name;
+  target.reviewedBy = reviewer.name;
+
+  logServerAudit(
+    reviewer.id,
+    reviewer.name,
+    action === 'ADD_TO_SALARY' ? 'افزودن کار در منزل به حقوق' : action === 'SETTLE_NOW' ? 'تسویه نقدی کار در منزل' : 'رد کار در منزل',
+    'کار در منزل',
+    `تعیین تکلیف کار در منزل ${target.employeeName} (${target.taskType}) توسط ${reviewer.name}`
+  );
+
+  persistDb();
+  res.json({ success: true, message: 'تغییر وضعیت با موفقیت انجام شد.', task: target });
+});
+
+app.delete('/api/homework-tasks/:id', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+  const { id } = req.params;
+  if (!db.homeworkTasks) db.homeworkTasks = [];
+  db.homeworkTasks = db.homeworkTasks.filter((t: any) => t.id !== id);
+  persistDb();
+  res.json({ success: true, message: 'مورد کار در منزل با موفقیت حذف شد.' });
+});
+
 // Bonuses and Penalties endpoint
 app.get('/api/bonuses', (req: Request, res: Response) => {
   const user = (req as any).user;
@@ -2029,135 +2158,20 @@ app.post('/api/salaries/calculate', requireRole('ADMIN', 'MANAGER'), (req: Reque
     });
   }
 
-  // Calculate based on exact minutes (Fixes PAY-001)
-  const monthlyAtt = db.attendance.filter((a: any) => a.employeeId === emp.id && a.date.startsWith(month));
-  const workDaysCount = monthlyAtt.filter((a: any) => a.status === 'PRESENT' || a.status === 'LATE' || a.status === 'EARLY_LEAVE' || a.status === 'ON_LEAVE').length;
-  const totalWorkedMinutes = monthlyAtt.reduce((sum: number, a: any) => sum + (a.workDurationMinutes || 0), 0);
-  const totalOvertimeMinutes = monthlyAtt.reduce((sum: number, a: any) => sum + (a.overtimeMinutes || 0), 0);
-
-  const workedHours = Number((totalWorkedMinutes / 60).toFixed(2));
-  const overtimeHours = Number((totalOvertimeMinutes / 60).toFixed(2));
-
-  // Effective hourly rate: if emp.hourlyRate is 0, compute from baseSalary / (workDays * dailyHours)
-  const standardWorkDays = db.settings.workDaysPerMonth || 22;
-  const standardDailyHours = db.settings.dailyWorkHours || 8;
-  const effectiveHourlyRate = emp.hourlyRate > 0
-    ? emp.hourlyRate
-    : Math.round(emp.baseSalary / (standardWorkDays * standardDailyHours));
-
-  // Multiplier from settings (Fixes PAY-003)
-  const overtimeMultiplier = db.settings.overtimeRateMultiplier || emp.overtimeRate || 1.4;
-  const overtimeAmount = Math.round((totalOvertimeMinutes / 60) * (effectiveHourlyRate * overtimeMultiplier));
-
-  // Absent days deduction
-  const absentDaysCount = monthlyAtt.filter((a: any) => a.status === 'ABSENT').length;
-  const dailyBaseWage = Math.round(emp.baseSalary / standardWorkDays);
-  const absentDeduction = absentDaysCount * dailyBaseWage;
-
-  const normMonth = month.replace(/-/g, '/');
-
-  // Advances for this month
-  const approvedAdvances = db.advances
-    .filter((a: any) => a.employeeId === emp.id && a.status === 'APPROVED' && (a.repayMonth?.replace(/-/g, '/') === normMonth))
-    .reduce((sum: number, a: any) => sum + a.amount, 0);
-
-  const discretionaryAdvances = (db.bonusesPenalties || [])
-    .filter((b: any) => b.employeeId === emp.id && (b.type === 'DISCRETIONARY_ADVANCE' || b.type === 'EXTRA_ADVANCE') && (b.month?.replace(/-/g, '/') === normMonth))
-    .reduce((sum: number, b: any) => sum + Number(b.amount || 0), 0);
-
-  const totalAdvances = approvedAdvances + discretionaryAdvances;
-
-  // Bonuses & Disciplinary Penalties
-  const bonuses = (db.bonusesPenalties || [])
-    .filter((b: any) => b.employeeId === emp.id && b.type === 'BONUS' && (b.month?.replace(/-/g, '/') === normMonth))
-    .reduce((sum: number, b: any) => sum + Number(b.amount || 0), 0);
-
-  const disciplinaryPenalties = (db.bonusesPenalties || [])
-    .filter((b: any) => b.employeeId === emp.id && b.type === 'PENALTY' && (b.month?.replace(/-/g, '/') === normMonth))
-    .reduce((sum: number, b: any) => sum + Number(b.amount || 0), 0);
-
-  const penalties = disciplinaryPenalties + absentDeduction;
-
-  // Personal card expenses added to salary for this employee in this month
-  const personalCardExpensesTotal = (db.expenses || [])
-    .filter((e: any) => e.employeeId === emp.id && e.status === 'ADDED_TO_SALARY' && (e.date?.startsWith(month) || e.date?.replace(/-/g, '/').startsWith(normMonth)))
-    .reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
-
-  // Miscellaneous payments with deductFromSalary === true for this employee in this month
-  const miscDeductionsTotal = (db.miscPayments || [])
-    .filter((m: any) => m.employeeId === emp.id && m.deductFromSalary && (m.month?.replace(/-/g, '/') === normMonth || m.date?.replace(/-/g, '/').startsWith(normMonth)))
-    .reduce((sum: number, m: any) => sum + Number(m.amount || 0), 0);
-
-  // مزایای رفاهی و انگیزشی: اولویت با مقادیر فیلد پرسنل است (حتی اگر صفر باشد)
-  const housing = typeof emp.housingAllowance === 'number'
-    ? Math.max(0, emp.housingAllowance)
-    : (db.settings.fixedHousingAllowance || 900000);
-
-  const grocery = typeof emp.groceryAllowance === 'number'
-    ? Math.max(0, emp.groceryAllowance)
-    : (db.settings.fixedGroceryAllowance || 1400000);
-
-  const child = typeof emp.childAllowance === 'number'
-    ? Math.max(0, emp.childAllowance)
-    : (db.settings.childAllowance || 0);
-
-  const grossSalary = emp.baseSalary + overtimeAmount + bonuses + housing + grocery + child;
-
-  // کسورات قانونی: بیمه و مالیات (در صورت صفر بودن فیلد یا معافیت پرسنل، کسر نشده و مبلغ ۰ ثبت می‌شود)
-  let insuranceDeduction = 0;
-  const isInsuranceExempt = emp.isInsuranceExempt === true || emp.insuranceRatePercent === 0;
-  if (!isInsuranceExempt) {
-    const insuranceRate = typeof emp.insuranceRatePercent === 'number'
-      ? emp.insuranceRatePercent
-      : (db.settings.insuranceRatePercent || 7);
-    if (insuranceRate > 0) {
-      const insuranceBase = emp.baseSalary + housing + grocery;
-      insuranceDeduction = Math.round(insuranceBase * (insuranceRate / 100));
-    }
-  }
-
-  let taxDeduction = 0;
-  const isTaxExempt = emp.isTaxExempt === true || emp.taxRatePercent === 0;
-  if (!isTaxExempt) {
-    const taxRate = typeof emp.taxRatePercent === 'number'
-      ? emp.taxRatePercent
-      : (db.settings.taxRatePercent || 10);
-    if (taxRate > 0) {
-      const taxable = Math.max(0, grossSalary - (db.settings.taxExemptionThreshold || 14000000));
-      taxDeduction = Math.round(taxable * (taxRate / 100));
-    }
-  }
-
-  const netSalary = Math.max(
-    0,
-    grossSalary - insuranceDeduction - taxDeduction - penalties - totalAdvances - miscDeductionsTotal + personalCardExpensesTotal
-  );
-
-  const newSlip = {
-    id: existing?.id || `sal_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    employeeId: emp.id,
+  // Single Authoritative Source of Truth: call calculatePayroll from payrollEngine!
+  const newSlip = calculatePayroll({
+    employee: emp,
+    settings: db.settings,
     month,
-    baseSalary: emp.baseSalary,
-    workDays: monthlyAtt.length === 0 ? standardWorkDays : workDaysCount,
-    workedHours,
-    overtimeHours,
-    overtimeAmount,
-    bonusesTotal: bonuses,
-    penaltiesTotal: penalties,
-    advancesTotal: totalAdvances,
-    discretionaryAdvancesTotal: discretionaryAdvances,
-    personalCardExpensesTotal,
-    miscDeductionsTotal,
-    insuranceDeduction,
-    taxDeduction,
-    housingAllowance: housing,
-    groceryAllowance: grocery,
-    childAllowance: child,
-    grossSalary,
-    netSalary,
-    status: 'CALCULATED',
-    createdAt: new Date().toISOString()
-  };
+    attendanceRecords: db.attendance || [],
+    advances: db.advances || [],
+    bonusesPenalties: db.bonusesPenalties || [],
+    workerExpenses: db.expenses || [],
+    homeworkTasks: db.homeworkTasks || [],
+    miscPayments: db.miscPayments || [],
+    missions: db.missions || [],
+    existingRecord: existing
+  });
 
   if (existing) {
     const idx = db.salaries.findIndex((s: any) => s.id === existing.id);
@@ -2165,6 +2179,14 @@ app.post('/api/salaries/calculate', requireRole('ADMIN', 'MANAGER'), (req: Reque
   } else {
     db.salaries.push(newSlip);
   }
+
+  logServerAudit(
+    (req as any).user.id,
+    (req as any).user.name,
+    'محاسبه حقوق و دستمزد',
+    'حقوق و دستمزد',
+    `محاسبه اتوماتیک فیش حقوقی ${emp.firstName} ${emp.lastName} برای دوره ${month}`
+  );
 
   if (!persistDb()) {
     return res.status(500).json({ success: false, message: 'خطا در ذخیره‌سازی داده در سرور' });

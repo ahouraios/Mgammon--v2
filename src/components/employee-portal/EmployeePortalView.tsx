@@ -1285,7 +1285,7 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
 
             {/* Service 4: Payslip */}
             <div
-              onClick={() => onNavigate('payroll')}
+              onClick={() => setIsPayslipsModalOpen(true)}
               className="bg-purple-50/80 hover:bg-purple-100 border border-purple-200/80 rounded-2xl p-3 text-center transition-all cursor-pointer flex flex-col items-center justify-between gap-1 shadow-2xs active:scale-98"
             >
               <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
@@ -2409,6 +2409,178 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* EMPLOYEE PAYSLIPS MODAL */}
+      {isPayslipsModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => setIsPayslipsModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 space-y-4 border border-slate-200 shadow-2xl animate-in zoom-in-95 text-right cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <button
+                type="button"
+                onClick={() => setIsPayslipsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <h3 className="font-black text-base text-slate-800 flex items-center gap-2">
+                <span>فیش‌های حقوقی من</span>
+                <FileText className="w-5 h-5 text-purple-600" />
+              </h3>
+            </div>
+
+            {mySalaries.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 space-y-2">
+                <FileText className="w-12 h-12 mx-auto text-slate-300 opacity-60" />
+                <p className="text-sm font-bold text-slate-600">هنوز فیش حقوقی برای شما صادر نشده است.</p>
+                <p className="text-xs text-slate-400">پس از محاسبه و صدور توسط واحد مالی کارگاه در این بخش نمایش داده می‌شود.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {mySalaries.map((sal) => (
+                  <div
+                    key={sal.id}
+                    className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 space-y-3"
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5">
+                      <span className={`text-[11px] font-black px-2.5 py-1 rounded-full border ${
+                        sal.status === 'PAID'
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : 'bg-amber-100 text-amber-800 border-amber-300'
+                      }`}>
+                        {sal.status === 'PAID' ? 'تسویه و پرداخت شده' : 'محاسبه شده / در انتظار پرداخت'}
+                      </span>
+                      <div className="text-right">
+                        <span className="font-black text-sm text-slate-900 block font-mono">دوره {sal.month}</span>
+                        {sal.paymentDate && (
+                          <span className="text-[10px] text-slate-400 font-mono">تاریخ پرداخت: {sal.paymentDate}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Attendance stats */}
+                    <div className="grid grid-cols-3 gap-2 text-center bg-white p-2.5 rounded-xl border border-slate-100 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">کارکرد موثر</span>
+                        <span className="font-bold text-slate-800 font-mono">{sal.workDays} روز</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">اضافه‌کاری</span>
+                        <span className="font-bold text-indigo-600 font-mono">{sal.overtimeHours} ساعت</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">غیبت غیرموجه</span>
+                        <span className="font-bold text-rose-600 font-mono">
+                          {typeof (sal as any).absentDaysCount === 'number' ? (sal as any).absentDaysCount : 0} روز
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Breakdown */}
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex justify-between text-slate-600">
+                        <span>حقوق پایه ماهانه:</span>
+                        <span className="font-mono font-bold text-slate-800">{formatCurrencyTomans(sal.baseSalary)}</span>
+                      </div>
+                      {sal.overtimeAmount > 0 && (
+                        <div className="flex justify-between text-indigo-600 font-medium">
+                          <span>مبلغ اضافه‌کاری:</span>
+                          <span className="font-mono">+{formatCurrencyTomans(sal.overtimeAmount)}</span>
+                        </div>
+                      )}
+                      {sal.housingAllowance > 0 && (
+                        <div className="flex justify-between text-slate-600">
+                          <span>حق مسکن:</span>
+                          <span className="font-mono">+{formatCurrencyTomans(sal.housingAllowance)}</span>
+                        </div>
+                      )}
+                      {sal.groceryAllowance > 0 && (
+                        <div className="flex justify-between text-slate-600">
+                          <span>بن خواربار:</span>
+                          <span className="font-mono">+{formatCurrencyTomans(sal.groceryAllowance)}</span>
+                        </div>
+                      )}
+                      {sal.childAllowance > 0 && (
+                        <div className="flex justify-between text-slate-600">
+                          <span>حق اولاد:</span>
+                          <span className="font-mono">+{formatCurrencyTomans(sal.childAllowance)}</span>
+                        </div>
+                      )}
+                      {sal.bonusesTotal > 0 && (
+                        <div className="flex justify-between text-emerald-600 font-medium">
+                          <span>پاداش تشویقی:</span>
+                          <span className="font-mono">+{formatCurrencyTomans(sal.bonusesTotal)}</span>
+                        </div>
+                      )}
+                      {sal.homeworkWagesTotal && sal.homeworkWagesTotal > 0 ? (
+                        <div className="flex justify-between text-purple-700 font-semibold bg-purple-50/70 px-2 py-1 rounded-lg">
+                          <span>دستمزد کار در منزل / کارمزدی:</span>
+                          <span className="font-mono">+{formatCurrencyTomans(sal.homeworkWagesTotal)}</span>
+                        </div>
+                      ) : null}
+                      {sal.personalCardExpensesTotal && sal.personalCardExpensesTotal > 0 ? (
+                        <div className="flex justify-between text-indigo-700 font-semibold bg-indigo-50/70 px-2 py-1 rounded-lg">
+                          <span>هزینه‌های تنخواه از کارت شخصی:</span>
+                          <span className="font-mono">+{formatCurrencyTomans(sal.personalCardExpensesTotal)}</span>
+                        </div>
+                      ) : null}
+
+                      {/* Deductions (Only show when > 0, suppress zero rows!) */}
+                      {sal.insuranceDeduction > 0 && (
+                        <div className="flex justify-between text-rose-600">
+                          <span>حق بیمه سهم کارمند:</span>
+                          <span className="font-mono">-{formatCurrencyTomans(sal.insuranceDeduction)}</span>
+                        </div>
+                      )}
+                      {sal.taxDeduction > 0 && (
+                        <div className="flex justify-between text-rose-600">
+                          <span>مالیات بر درآمد:</span>
+                          <span className="font-mono">-{formatCurrencyTomans(sal.taxDeduction)}</span>
+                        </div>
+                      )}
+                      {sal.advancesTotal > 0 && (
+                        <div className="flex justify-between text-rose-600">
+                          <span>کسر مساعده دریافتی:</span>
+                          <span className="font-mono">-{formatCurrencyTomans(sal.advancesTotal)}</span>
+                        </div>
+                      )}
+                      {sal.penaltiesTotal > 0 && (
+                        <div className="flex justify-between text-rose-600">
+                          <span>کسر غیبت و جرایم:</span>
+                          <span className="font-mono">-{formatCurrencyTomans(sal.penaltiesTotal)}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Net Salary Total */}
+                    <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
+                      <span className="font-black text-xs text-slate-800">خالص دریافتی نهایی:</span>
+                      <span className="font-mono font-black text-base text-emerald-600">
+                        {formatCurrencyTomans(sal.netSalary)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="pt-2 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsPayslipsModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer"
+              >
+                بستن
+              </button>
+            </div>
           </div>
         </div>
       )}
