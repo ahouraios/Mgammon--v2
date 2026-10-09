@@ -745,6 +745,16 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
                       (غیبت کسر شده: {viewingPayslip.absentDaysCount} روز)
                     </span>
                   )}
+                  {typeof (viewingPayslip as any).officialHolidayDaysCount === 'number' && (viewingPayslip as any).officialHolidayDaysCount > 0 && (
+                    <span className="text-[10px] text-slate-500 block mt-0.5 font-medium">
+                      (تعطیل رسمی: {(viewingPayslip as any).officialHolidayDaysCount} روز)
+                    </span>
+                  )}
+                  {typeof (viewingPayslip as any).emergencyShutdownPaidDaysCount === 'number' && (viewingPayslip as any).emergencyShutdownPaidDaysCount > 0 && (
+                    <span className="text-[10px] text-emerald-600 block mt-0.5 font-medium">
+                      (تعطیلی اضطراری باحقوق: {(viewingPayslip as any).emergencyShutdownPaidDaysCount} روز)
+                    </span>
+                  )}
                 </div>
               </div>
 

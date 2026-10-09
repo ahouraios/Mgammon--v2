@@ -20,7 +20,8 @@ import {
   HomeworkTask,
   HomeworkTaskStatus,
   FinancialReminder,
-  FinancialReminderStatus
+  FinancialReminderStatus,
+  CalendarEvent
 } from '../types';
 import {
   initialCompanySettings,
@@ -34,7 +35,8 @@ import {
   initialUsers,
   initialBonusesPenalties,
   initialBroadcastMessages,
-  initialFinancialReminders
+  initialFinancialReminders,
+  initialCalendarEvents
 } from '../data/initialData';
 import { getCurrentTimeStr, getTodayShamsi, calculateGpsDistanceMeters, formatCurrencyTomans, getDatesBetweenShamsi, toEnglishDigits, formatCardNumber } from '../utils/dateUtils';
 import { calculatePayroll } from '../utils/payrollEngine';
@@ -42,6 +44,7 @@ import { calculatePayroll } from '../utils/payrollEngine';
 const STORAGE_KEYS = {
   SETTINGS: 'mgommon_company_settings_v4',
   SHIFTS: 'mgommon_shifts_v4',
+  CALENDAR_EVENTS: 'mgommon_calendar_events_v4',
   EMPLOYEES: 'mgommon_employees_v4',
   ATTENDANCE: 'mgommon_attendance_v4',
   LEAVES: 'mgommon_leaves_v4',
@@ -2757,6 +2760,8 @@ export class StorageService {
     const homeworkTasks = this.getAllHomeworkTasksRaw();
     const miscPayments = this.getAllMiscPaymentsRaw();
     const missions = this.getAllWorkMissionsRaw();
+    const calendarEvents = this.getCalendarEvents();
+    const shifts = this.getShifts();
 
     const record = calculatePayroll({
       employee: emp,
@@ -2769,6 +2774,8 @@ export class StorageService {
       homeworkTasks,
       miscPayments,
       missions,
+      calendarEvents,
+      shifts,
       existingRecord: existing
     });
 
@@ -2882,6 +2889,46 @@ export class StorageService {
     this.addAuditLog('حذف شیفت', 'تنظیمات', `شیفت کاری با شناسه ${shiftId} حذف شد.`);
   }
 
+  // ==================== CALENDAR & HOLIDAYS ====================
+  static getCalendarEvents(): CalendarEvent[] {
+    return getItem<CalendarEvent[]>(STORAGE_KEYS.CALENDAR_EVENTS, initialCalendarEvents);
+  }
+
+  static saveCalendarEvents(events: CalendarEvent[]): void {
+    setItem(STORAGE_KEYS.CALENDAR_EVENTS, events);
+  }
+
+  static addCalendarEvent(event: CalendarEvent): void {
+    const events = this.getCalendarEvents();
+    this.saveCalendarEvents([...events, event]);
+    this.addAuditLog(
+      'ثبت رویداد تقویم',
+      'تقویم کاری و تعطیلات',
+      `رویداد "${event.title}" (${event.type === 'OFFICIAL_HOLIDAY' ? 'تعطیل رسمی' : event.type === 'EMERGENCY_SHUTDOWN' ? 'تعطیلی اضطراری' : event.type}) از ${event.startDate} تا ${event.endDate} ثبت شد.`
+    );
+  }
+
+  static updateCalendarEvent(event: CalendarEvent): void {
+    const events = this.getCalendarEvents().map(e => e.id === event.id ? event : e);
+    this.saveCalendarEvents(events);
+    this.addAuditLog(
+      'ویرایش رویداد تقویم',
+      'تقویم کاری و تعطیلات',
+      `رویداد تقویم "${event.title}" با شناسه ${event.id} ویرایش شد.`
+    );
+  }
+
+  static deleteCalendarEvent(eventId: string): void {
+    const target = this.getCalendarEvents().find(e => e.id === eventId);
+    const events = this.getCalendarEvents().filter(e => e.id !== eventId);
+    this.saveCalendarEvents(events);
+    this.addAuditLog(
+      'حذف رویداد تقویم',
+      'تقویم کاری و تعطیلات',
+      `رویداد تقویم "${target?.title || eventId}" حذف شد.`
+    );
+  }
+
   static getAllBonusesPenaltiesRaw(): BonusOrPenalty[] {
     return getItem<BonusOrPenalty[]>(STORAGE_KEYS.BONUSES, initialBonusesPenalties);
   }
@@ -2992,6 +3039,7 @@ export class StorageService {
       data: {
         settings: this.getSettings(),
         shifts: this.getShifts(),
+        calendarEvents: this.getCalendarEvents(),
         employees: this.getAllEmployeesRaw(),
         users: usersSanitized,
         attendance: this.getAllAttendanceRaw(),
@@ -3021,6 +3069,7 @@ export class StorageService {
       const d = parsed.data;
       if (d.settings) this.saveSettings(d.settings);
       if (Array.isArray(d.shifts)) this.saveShifts(d.shifts);
+      if (Array.isArray(d.calendarEvents)) this.saveCalendarEvents(d.calendarEvents);
       if (Array.isArray(d.employees)) this.saveEmployees(d.employees);
       if (Array.isArray(d.attendance)) this.saveAttendance(d.attendance);
       if (Array.isArray(d.leaves)) this.saveLeaveRequests(d.leaves);

@@ -178,6 +178,25 @@ export interface Shift {
   thursdayEndTime?: string; // "13:00"
 }
 
+export type CalendarEventType = 'OFFICIAL_HOLIDAY' | 'WEEKLY_OFF' | 'EMERGENCY_SHUTDOWN' | 'SPECIAL_WORKDAY';
+export type CalendarPaidStatus = 'PAID' | 'UNPAID' | 'HALF_PAID';
+
+export interface CalendarEvent {
+  id: string;
+  companyId: string;
+  startDate: string; // Shamsi date e.g. "1405/01/01"
+  endDate: string; // Shamsi date e.g. "1405/01/04"
+  title: string;
+  type: CalendarEventType;
+  description?: string;
+  scope: 'ALL' | 'WORKSHOP'; // سراسری یا محدود به کارگاه
+  workshopId?: string; // اگر scope === 'WORKSHOP'
+  isActive: boolean;
+  paidStatus: CalendarPaidStatus; // PAID = باحقوق, UNPAID = بدون حقوق
+  createdAt?: string;
+  createdBy?: string;
+}
+
 export type AttendanceStatus = 'PRESENT' | 'LATE' | 'EARLY_LEAVE' | 'ABSENT' | 'ON_LEAVE' | 'HOLIDAY';
 
 export interface AttendanceRecord {
@@ -382,6 +401,10 @@ export interface SalaryRecord {
   explicitAbsentDaysCount?: number;
   unrecordedDaysCount?: number;
   incompleteDaysCount?: number;
+  officialHolidayDaysCount?: number;
+  emergencyShutdownPaidDaysCount?: number;
+  emergencyShutdownUnpaidDaysCount?: number;
+  weeklyOffDaysCount?: number;
   dailyBaseWage?: number;
   effectiveHourlyRate?: number;
   absentDeduction?: number;

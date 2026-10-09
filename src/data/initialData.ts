@@ -10,7 +10,8 @@ import {
   User,
   BonusOrPenalty,
   BroadcastMessage,
-  FinancialReminder
+  FinancialReminder,
+  CalendarEvent
 } from '../types';
 import { getTodayShamsi } from '../utils/dateUtils';
 
@@ -212,3 +213,6 @@ export const initialFinancialReminders: FinancialReminder[] = [
     seenBySeniorAdmin: false
   }
 ];
+
+export const initialCalendarEvents: CalendarEvent[] = [];
+

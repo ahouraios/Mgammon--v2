@@ -178,6 +178,7 @@ interface DatabaseSchema {
   salaries: any[];
   bonusesPenalties?: any[];
   homeworkTasks?: any[];
+  calendarEvents?: any[];
   auditLogs: any[];
   messages: any[];
   alarms?: any[];
@@ -308,6 +309,7 @@ function loadInitialDb(): DatabaseSchema {
     salaries: [],
     bonusesPenalties: [],
     homeworkTasks: [],
+    calendarEvents: [],
     auditLogs: [
       {
         id: 'log_launch',
@@ -2170,6 +2172,8 @@ app.post('/api/salaries/calculate', requireRole('ADMIN', 'MANAGER'), (req: Reque
     homeworkTasks: db.homeworkTasks || [],
     miscPayments: db.miscPayments || [],
     missions: db.missions || [],
+    calendarEvents: db.calendarEvents || [],
+    shifts: db.shifts || [],
     existingRecord: existing
   });
 
@@ -2305,6 +2309,102 @@ app.put('/api/settings', requireRole('ADMIN'), (req: Request, res: Response) => 
   res.json({ success: true, settings: sanitizeSettingsForClient(db.settings) });
 });
 
+// ==========================================
+// CALENDAR & HOLIDAYS MANAGEMENT APIS
+// ==========================================
+app.get('/api/calendar/events', requireAuth, (req: Request, res: Response) => {
+  res.json({ success: true, events: db.calendarEvents || [] });
+});
+
+app.post('/api/calendar/events', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+  const { startDate, endDate, title, type, description, scope, workshopId, paidStatus, isActive } = req.body;
+  if (!startDate || !title || !type) {
+    return res.status(400).json({ success: false, message: 'تاریخ، عنوان و نوع رویداد تقویم الزامی هستند.' });
+  }
+
+  const user = (req as any).user;
+  const newEvent = {
+    id: `cal_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    companyId: db.settings?.id || 'comp_mgommon_01',
+    startDate,
+    endDate: endDate || startDate,
+    title: title.trim(),
+    type: type || 'OFFICIAL_HOLIDAY',
+    description: description ? description.trim() : '',
+    scope: scope === 'WORKSHOP' ? 'WORKSHOP' : 'ALL',
+    workshopId: scope === 'WORKSHOP' ? workshopId : undefined,
+    isActive: isActive !== false,
+    paidStatus: paidStatus || 'PAID',
+    createdAt: new Date().toISOString(),
+    createdBy: user?.name || 'مدیر'
+  };
+
+  if (!db.calendarEvents) db.calendarEvents = [];
+  db.calendarEvents.push(newEvent);
+  persistDb();
+
+  logServerAudit(
+    user?.id || 'usr_admin',
+    user?.name || 'مدیر',
+    'ثبت رویداد تقویم',
+    'تقویم و تعطیلات',
+    `رویداد تقویم "${newEvent.title}" (${newEvent.startDate} الی ${newEvent.endDate}) ثبت شد.`
+  );
+
+  res.json({ success: true, event: newEvent });
+});
+
+app.put('/api/calendar/events/:id', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+  const { id } = req.params;
+  if (!db.calendarEvents) db.calendarEvents = [];
+  const idx = db.calendarEvents.findIndex((e: any) => e.id === id);
+  if (idx < 0) {
+    return res.status(404).json({ success: false, message: 'رویداد تقویم یافت نشد.' });
+  }
+
+  const existing = db.calendarEvents[idx];
+  const updated = {
+    ...existing,
+    ...req.body,
+    id: existing.id,
+    companyId: existing.companyId
+  };
+  db.calendarEvents[idx] = updated;
+  persistDb();
+
+  const user = (req as any).user;
+  logServerAudit(
+    user?.id || 'usr_admin',
+    user?.name || 'مدیر',
+    'ویرایش رویداد تقویم',
+    'تقویم و تعطیلات',
+    `رویداد "${updated.title}" ویرایش شد.`
+  );
+
+  res.json({ success: true, event: updated });
+});
+
+app.delete('/api/calendar/events/:id', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+  const { id } = req.params;
+  const initialLen = (db.calendarEvents || []).length;
+  db.calendarEvents = (db.calendarEvents || []).filter((e: any) => e.id !== id);
+  if (db.calendarEvents.length === initialLen) {
+    return res.status(404).json({ success: false, message: 'رویداد تقویم یافت نشد.' });
+  }
+  persistDb();
+
+  const user = (req as any).user;
+  logServerAudit(
+    user?.id || 'usr_admin',
+    user?.name || 'مدیر',
+    'حذف رویداد تقویم',
+    'تقویم و تعطیلات',
+    `رویداد تقویم با شناسه ${id} حذف شد.`
+  );
+
+  res.json({ success: true, message: 'رویداد تقویم با موفقیت حذف شد.' });
+});
+
 // Full Backup Export strictly for Super Admin (Fixes BACKUP-002)
 app.get('/api/backup/export', requireRole('ADMIN'), (req: Request, res: Response) => {
   const user = (req as any).user;
@@ -2332,6 +2432,7 @@ app.get('/api/backup/export', requireRole('ADMIN'), (req: Request, res: Response
       advances: db.advances,
       salaries: db.salaries,
       bonusesPenalties: db.bonusesPenalties || [],
+      calendarEvents: db.calendarEvents || [],
       auditLogs: db.auditLogs,
       messages: db.messages
     }
@@ -2356,6 +2457,7 @@ app.post('/api/backup/import', requireRole('ADMIN'), (req: Request, res: Respons
   try {
     db.settings = data.settings;
     if (data.shifts) db.shifts = data.shifts;
+    if (data.calendarEvents) db.calendarEvents = data.calendarEvents;
     if (data.employees) db.employees = data.employees;
     if (data.attendance) db.attendance = data.attendance;
     if (data.leaves) db.leaves = data.leaves;

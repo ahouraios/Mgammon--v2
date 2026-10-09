@@ -88,6 +88,40 @@ export function getDaysInJalaliMonth(jy: number, jm: number): number {
   return 30;
 }
 
+/**
+ * Returns Persian weekday index for a given Shamsi date:
+ * 0: شنبه (Sat), 1: یکشنبه (Sun), 2: دوشنبه (Mon), 3: سه‌شنبه (Tue), 4: چهارشنبه (Wed), 5: پنج‌شنبه (Thu), 6: جمعه (Fri)
+ */
+export function getWeekdayIndexFromShamsi(shamsiDate: string): number {
+  if (!shamsiDate) return 0;
+  const parts = shamsiDate.split(/[/ -]/).map(Number);
+  const jy = parts[0] || 1405;
+  const jm = parts[1] || 1;
+  const jd = parts[2] || 1;
+  const [gy, gm, gd] = jalaliToGregorian(jy, jm, jd);
+  const d = new Date(gy, gm - 1, gd);
+  const jsDay = d.getDay(); // 0 is Sun, 6 is Sat
+  return (jsDay + 1) % 7;
+}
+
+/**
+ * Returns all dates in a Shamsi month (YYYY/MM) as an array of YYYY/MM/DD strings
+ */
+export function getDatesInShamsiMonth(monthStr: string): string[] {
+  if (!monthStr) return [];
+  const parts = monthStr.split(/[/ -]/).map(Number);
+  const jy = parts[0] || 1405;
+  const jm = parts[1] || 1;
+  const totalDays = getDaysInJalaliMonth(jy, jm);
+  const mm = jm < 10 ? `0${jm}` : `${jm}`;
+  const dates: string[] = [];
+  for (let d = 1; d <= totalDays; d++) {
+    const dd = d < 10 ? `0${d}` : `${d}`;
+    dates.push(`${jy}/${mm}/${dd}`);
+  }
+  return dates;
+}
+
 export function getJalaliMonthFirstDayOfWeek(jy: number, jm: number): number {
   const [gy, gm, gd] = jalaliToGregorian(jy, jm, 1);
   const date = new Date(gy, gm - 1, gd);

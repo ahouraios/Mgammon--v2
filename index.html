@@ -5,6 +5,22 @@
       // AI Studio preview environment runs behind proxy without HMR WebSocket.
       // Ignore WebSocket connection errors as specified by environment guidelines.
       (function() {
+        if (typeof window !== 'undefined' && window.WebSocket) {
+          var RealWebSocket = window.WebSocket;
+          window.WebSocket = function(url, protocols) {
+            var ws = protocols !== undefined ? new RealWebSocket(url, protocols) : new RealWebSocket(url);
+            ws.addEventListener('error', function(e) {
+              if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
+            });
+            return ws;
+          };
+          window.WebSocket.prototype = RealWebSocket.prototype;
+          window.WebSocket.CONNECTING = RealWebSocket.CONNECTING;
+          window.WebSocket.OPEN = RealWebSocket.OPEN;
+          window.WebSocket.CLOSING = RealWebSocket.CLOSING;
+          window.WebSocket.CLOSED = RealWebSocket.CLOSED;
+        }
+
         var origError = console.error;
         console.error = function() {
           for (var i = 0; i < arguments.length; i++) {

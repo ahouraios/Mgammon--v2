@@ -2467,7 +2467,7 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
                     </div>
 
                     {/* Attendance stats */}
-                    <div className="grid grid-cols-3 gap-2 text-center bg-white p-2.5 rounded-xl border border-slate-100 text-xs">
+                    <div className="grid grid-cols-4 gap-2 text-center bg-white p-2.5 rounded-xl border border-slate-100 text-xs">
                       <div>
                         <span className="text-[10px] text-slate-400 block">کارکرد موثر</span>
                         <span className="font-bold text-slate-800 font-mono">{sal.workDays} روز</span>
@@ -2475,6 +2475,12 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
                       <div>
                         <span className="text-[10px] text-slate-400 block">اضافه‌کاری</span>
                         <span className="font-bold text-indigo-600 font-mono">{sal.overtimeHours} ساعت</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">تعطیل رسمی</span>
+                        <span className="font-bold text-slate-600 font-mono">
+                          {typeof (sal as any).officialHolidayDaysCount === 'number' ? (sal as any).officialHolidayDaysCount : 0} روز
+                        </span>
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-400 block">غیبت غیرموجه</span>
