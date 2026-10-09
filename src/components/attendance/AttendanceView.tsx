@@ -16,8 +16,10 @@ import {
   Briefcase,
   Navigation,
   Trash2,
+  BookOpen,
+  MessageSquare
 } from 'lucide-react';
-import { AttendanceRecord, Employee, Shift, User as AppUser, WorkMission } from '../../types';
+import { AttendanceRecord, Employee, Shift, User as AppUser, WorkMission, WorkReport } from '../../types';
 import {
   getTodayShamsi,
   minutesToHoursAndMinutes,
@@ -94,8 +96,11 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     notes: '',
   });
 
-  // Sub-tabs: Attendance vs Work Missions
-  const [activeTab, setActiveTab] = useState<'ATTENDANCE' | 'MISSIONS'>('ATTENDANCE');
+  // Sub-tabs: Attendance vs Work Missions vs Work Reports
+  const [activeTab, setActiveTab] = useState<'ATTENDANCE' | 'MISSIONS' | 'WORK_REPORTS'>('ATTENDANCE');
+  const [reportFeedbackModalId, setReportFeedbackModalId] = useState<string | null>(null);
+  const [reportFeedbackText, setReportFeedbackText] = useState('');
+  const [selectedReportTagFilter, setSelectedReportTagFilter] = useState('ALL');
   const [isMissionModalOpen, setIsMissionModalOpen] = useState(false);
   const [missionMsg, setMissionMsg] = useState<{ success: boolean; text: string } | null>(null);
   const [missionForm, setMissionForm] = useState({
@@ -511,6 +516,30 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
           )}
         </button>
 
+        <button
+          type="button"
+          onClick={() => setActiveTab('WORK_REPORTS')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+            activeTab === 'WORK_REPORTS'
+              ? 'bg-indigo-600 text-white shadow-xs'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          <span>گزارش‌های کاری پرسنل</span>
+          {StorageService.getWorkReports(currentUser).length > 0 && (
+            <span
+              className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+                activeTab === 'WORK_REPORTS'
+                  ? 'bg-indigo-700 text-white'
+                  : 'bg-slate-100 text-slate-700'
+              }`}
+            >
+              {StorageService.getWorkReports(currentUser).length}
+            </span>
+          )}
+        </button>
+
         {activeTab === 'MISSIONS' && (
           <button
             type="button"
@@ -676,6 +705,9 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                 <th className="py-3.5 px-4">اضافه‌کاری</th>
                 <th className="py-3.5 px-4">وضعیت</th>
                 <th className="py-3.5 px-4">روش ثبت</th>
+                {canManage && !isEmployeeRole && (
+                  <th className="py-3.5 px-4 text-center">دستور مدیر (تمام‌وقت)</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -767,6 +799,38 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                       </td>
                       <td className="py-3 px-4">{getStatusBadge(rec.status, rec.lateMinutes)}</td>
                       <td className="py-3 px-4">{getMethodBadge(rec.checkInMethod, rec)}</td>
+                      {canManage && !isEmployeeRole && (
+                        <td className="py-3 px-4 text-center">
+                          {rec.isManagerCreditFullDay ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                StorageService.setAttendanceCreditFullDay(rec.id, false, currentUser?.name || 'مدیر');
+                                onRefresh();
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 text-[11px] font-bold border border-emerald-300 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 transition-colors cursor-pointer"
+                              title="کلیک برای لغو محاسبه تمام‌وقت"
+                            >
+                              ✓ تایید تمام‌وقت (لغو)
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const reason = prompt('علت موافقت مدیر با محاسبه تمام‌وقت و کامل این روز (بدون کسر حقوق):', 'موافقت با خاتمه زودهنگام کار / نیاز کارگاه');
+                                if (reason !== null) {
+                                  StorageService.setAttendanceCreditFullDay(rec.id, true, currentUser?.name || 'مدیر', reason || 'تایید مدیر ارشد');
+                                  onRefresh();
+                                }
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-medium border border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-colors cursor-pointer"
+                              title="محاسبه روز به صورت تمام‌وقت به دستور مدیر علی‌رغم خروج زودتر یا کسر ساعات"
+                            >
+                              محاسبه تمام‌وقت
+                            </button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   );
                 })
@@ -933,6 +997,192 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WORK REPORTS VIEW */}
+      {activeTab === 'WORK_REPORTS' && (
+        <div className="space-y-4">
+          <div className="bg-teal-50/80 border border-teal-200 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <h3 className="font-bold text-sm text-teal-950 flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-teal-700" />
+                <span>گزارش‌های کاری روزانه و فعالیت‌های ثبت‌شده پرسنل</span>
+              </h3>
+              <p className="text-xs text-teal-800 leading-relaxed">
+                مشاهده و بررسی گزارش‌های ثبت‌شده توسط پرسنل با امکان درج دستور یا بازخورد مدیریت ارشد و منابع انسانی
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedReportTagFilter}
+                onChange={(e) => setSelectedReportTagFilter(e.target.value)}
+                className="text-xs p-2 rounded-xl border border-teal-200 bg-white text-teal-900 outline-none"
+              >
+                <option value="ALL">همه دسته‌بندی‌ها</option>
+                <option value="تولید و ماشین‌کاری">تولید و ماشین‌کاری</option>
+                <option value="مونتاژ و اتصالات">مونتاژ و اتصالات</option>
+                <option value="سنباده‌زنی و پرداخت">سنباده‌زنی و پرداخت</option>
+                <option value="رنگ‌کاری و پلی‌استر">رنگ‌کاری و پلی‌استر</option>
+                <option value="بسته‌بندی و انبار">بسته‌بندی و انبار</option>
+                <option value="کنترل کیفیت">کنترل کیفیت</option>
+                <option value="امور اداری و دفتری">امور اداری و دفتری</option>
+                <option value="فنی و تعمیرات">فنی و تعمیرات</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {StorageService.getWorkReports(currentUser)
+              .filter((r) => selectedReportTagFilter === 'ALL' || (r.tags && r.tags.includes(selectedReportTagFilter)))
+              .length === 0 ? (
+              <div className="col-span-2 py-12 text-center bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs">
+                هیچ گزارش کاری در این بخش ثبت نشده است.
+              </div>
+            ) : (
+              StorageService.getWorkReports(currentUser)
+                .filter((r) => selectedReportTagFilter === 'ALL' || (r.tags && r.tags.includes(selectedReportTagFilter)))
+                .map((rep) => (
+                  <div
+                    key={rep.id}
+                    className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-xs hover:border-slate-300 transition-all text-xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${
+                          rep.status === 'ACKNOWLEDGED'
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                            : 'bg-teal-100 text-teal-800 border-teal-300'
+                        }`}>
+                          {rep.status === 'ACKNOWLEDGED' ? '✓ تایید و رویت مدیر' : 'در انتظار بررسی'}
+                        </span>
+                        {rep.tags && rep.tags.length > 0 && (
+                          <span className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md">
+                            {rep.tags[0]}
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-mono text-slate-500 font-bold">{rep.date}</span>
+                    </div>
+
+                    <div>
+                      <div className="font-bold text-slate-900 text-sm">{rep.employeeName}</div>
+                      <h4 className="font-semibold text-teal-800 mt-1">{rep.title}</h4>
+                    </div>
+
+                    <p className="text-slate-700 leading-relaxed whitespace-pre-wrap bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      {rep.content}
+                    </p>
+
+                    {rep.hoursSpent && (
+                      <div className="text-[11px] text-teal-700 font-bold">
+                        ⏱️ مدت زمان صرف‌شده: {rep.hoursSpent} ساعت کاری
+                      </div>
+                    )}
+
+                    {rep.adminFeedback && (
+                      <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 space-y-1">
+                        <div className="font-bold flex items-center justify-between text-[11px]">
+                          <span>دستور و نظر مدیریت:</span>
+                          <span className="text-[10px] text-amber-700">{rep.feedbackBy || 'مدیر'}</span>
+                        </div>
+                        <p>{rep.adminFeedback}</p>
+                      </div>
+                    )}
+
+                    {canManage && (
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReportFeedbackModalId(rep.id);
+                            setReportFeedbackText(rep.adminFeedback || '');
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-teal-50 text-teal-700 hover:bg-teal-100 font-bold text-[11px] border border-teal-200 cursor-pointer flex items-center gap-1"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          <span>{rep.adminFeedback ? 'ویرایش بازخورد مدیر' : 'ثبت بازخورد / تایید'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm('آیا از حذف این گزارش کاری اطمینان دارید؟')) {
+                              StorageService.deleteWorkReport(rep.id);
+                              onRefresh();
+                            }
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded cursor-pointer"
+                          title="حذف گزارش"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* FEEDBACK MODAL FOR WORK REPORT */}
+      {reportFeedbackModalId && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => setReportFeedbackModalId(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-md w-full border border-slate-200 p-6 space-y-4 shadow-xl cursor-default text-right"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <button
+                type="button"
+                onClick={() => setReportFeedbackModalId(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                <span>دستور و بازخورد مدیریت به پرسنل</span>
+                <MessageSquare className="w-4 h-4 text-teal-600" />
+              </h3>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                متن بازخورد یا دستورالعمل مدیر ارشد / منابع انسانی:
+              </label>
+              <textarea
+                rows={3}
+                value={reportFeedbackText}
+                onChange={(e) => setReportFeedbackText(e.target.value)}
+                placeholder="مثال: کارکرد شما بررسی شد و مورد تایید است / به لولای قطعات دقت بیشتری شود..."
+                className="w-full text-xs p-2.5 rounded-xl border border-slate-200 outline-none focus:border-teal-600"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setReportFeedbackModalId(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                انصراف
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  StorageService.reviewWorkReport(reportFeedbackModalId, reportFeedbackText, currentUser?.name || 'مدیریت');
+                  setReportFeedbackModalId(null);
+                  onRefresh();
+                }}
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white cursor-pointer shadow-xs"
+              >
+                ثبت بازخورد
+              </button>
             </div>
           </div>
         </div>

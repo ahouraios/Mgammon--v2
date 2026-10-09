@@ -133,6 +133,10 @@ export const LeavesView: React.FC<LeavesViewProps> = ({
     switch (type) {
       case 'EARNED':
         return <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700">استحقاقی</span>;
+      case 'INCENTIVE':
+        return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-teal-50 text-teal-700 border border-teal-200">مرخصی تشویقی (بدون کسر سهمیه)</span>;
+      case 'SPECIAL':
+        return <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">مرخصی ویژه مدیریتی (اضافه)</span>;
       case 'HOURLY':
         return <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700">ساعتی</span>;
       case 'MEDICAL':
@@ -565,6 +569,8 @@ export const LeavesView: React.FC<LeavesViewProps> = ({
                   className="w-full text-xs p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 bg-white"
                 >
                   <option value="EARNED">استحقاقی (کسر از مانده مرخصی)</option>
+                  <option value="INCENTIVE">مرخصی تشویقی / پاداشی (با حقوق، بدون کسر از سهمیه)</option>
+                  <option value="SPECIAL">مرخصی ویژه مدیریتی (اضافه بر سهمیه / موردی)</option>
                   <option value="HOURLY">ساعتی (در طول شیفت کاری)</option>
                   <option value="MEDICAL">استعلاجی (با ارائه گواهی پزشک)</option>
                   <option value="UNPAID">بدون حقوق</option>

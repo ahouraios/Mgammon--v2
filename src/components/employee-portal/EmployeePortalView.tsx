@@ -38,7 +38,8 @@ import {
   Plus,
   PackageCheck,
   CheckCircle2,
-  Edit2
+  Edit2,
+  BookOpen
 } from 'lucide-react';
 import {
   Employee,
@@ -51,7 +52,8 @@ import {
   ExpenseStatus,
   WorkshopAlarm,
   HomeworkTask,
-  HomeworkTaskStatus
+  HomeworkTaskStatus,
+  WorkReport
 } from '../../types';
 import { CopyButton } from '../common/CopyButton';
 import { StorageService } from '../../services/storage';
@@ -182,6 +184,17 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
   const [isPayslipsModalOpen, setIsPayslipsModalOpen] = useState(false);
+
+  // Daily Work Reports (گزارش کاری روزانه اختیاری پرسنل)
+  const [isWorkReportModalOpen, setIsWorkReportModalOpen] = useState(false);
+  const [isWorkReportHistoryModalOpen, setIsWorkReportHistoryModalOpen] = useState(false);
+  const [reportTitle, setReportTitle] = useState('');
+  const [reportContent, setReportContent] = useState('');
+  const [reportHours, setReportHours] = useState<number | ''>('');
+  const [reportTag, setReportTag] = useState('تولید و مونتاژ');
+  const [reportDate, setReportDate] = useState(getTodayShamsi());
+  const [reportMsg, setReportMsg] = useState<{ success: boolean; text: string } | null>(null);
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
   // Active Workshop Alarm State for Employee
   const [activeAlarm, setActiveAlarm] = useState<WorkshopAlarm | null>(null);
@@ -701,6 +714,10 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
   );
   const pendingHomeworkCount = myHomeworkTasks.filter((t) => t.status === 'PENDING').length;
 
+  const myWorkReports: WorkReport[] = StorageService.getWorkReports(currentUser).filter(
+    (r) => r.employeeId === currentEmployee?.id
+  );
+
   if (!currentEmployee) {
     return (
       <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xs text-center space-y-4">
@@ -1219,7 +1236,7 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
             </h4>
           </div>
 
-          <div className={`grid gap-2 sm:gap-2.5 ${currentEmployee.isHomeworkWorker ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-4'}`}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 sm:gap-2.5">
             {/* Service 0: Homework if enabled */}
             {currentEmployee.isHomeworkWorker && (
               <div
@@ -1242,7 +1259,22 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
               </div>
             )}
 
-            {/* Service 1: Personal Purchase */}
+            {/* Service 1: Optional Daily Work Report */}
+            <div
+              onClick={() => {
+                setReportMsg(null);
+                setIsWorkReportModalOpen(true);
+              }}
+              className="relative bg-teal-50/80 hover:bg-teal-100 border border-teal-200/80 rounded-2xl p-3 text-center transition-all cursor-pointer flex flex-col items-center justify-between gap-1 shadow-2xs active:scale-98"
+            >
+              <div className="w-9 h-9 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center">
+                <BookOpen className="w-4 h-4 text-teal-600" />
+              </div>
+              <span className="text-[11px] font-extrabold text-slate-800 leading-tight">گزارش کاری</span>
+              <span className="text-[9px] text-teal-700 font-medium">اختیاری روزانه</span>
+            </div>
+
+            {/* Service 2: Personal Purchase */}
             <div
               onClick={() => setIsExpenseModalOpen(true)}
               className="relative bg-sky-50/80 hover:bg-sky-100 border border-sky-200/80 rounded-2xl p-3 text-center transition-all cursor-pointer flex flex-col items-center justify-between gap-1 shadow-2xs active:scale-98"
@@ -1259,7 +1291,7 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
               <span className="text-[9px] text-sky-700 font-medium">در انتظار تسویه</span>
             </div>
 
-            {/* Service 2: Advance Request */}
+            {/* Service 3: Advance Request */}
             <div
               onClick={() => onNavigate('advances')}
               className="bg-amber-50/80 hover:bg-amber-100 border border-amber-200/80 rounded-2xl p-3 text-center transition-all cursor-pointer flex flex-col items-center justify-between gap-1 shadow-2xs active:scale-98"
@@ -1271,7 +1303,7 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
               <span className="text-[9px] text-amber-700 font-medium">درخواست</span>
             </div>
 
-            {/* Service 3: Leave Request */}
+            {/* Service 4: Leave Request */}
             <div
               onClick={() => onNavigate('leaves')}
               className="bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200/80 rounded-2xl p-3 text-center transition-all cursor-pointer flex flex-col items-center justify-between gap-1 shadow-2xs active:scale-98"
@@ -1283,7 +1315,7 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
               <span className="text-[9px] text-emerald-700 font-medium">درخواست</span>
             </div>
 
-            {/* Service 4: Payslip */}
+            {/* Service 5: Payslip */}
             <div
               onClick={() => setIsPayslipsModalOpen(true)}
               className="bg-purple-50/80 hover:bg-purple-100 border border-purple-200/80 rounded-2xl p-3 text-center transition-all cursor-pointer flex flex-col items-center justify-between gap-1 shadow-2xs active:scale-98"
@@ -1308,7 +1340,41 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
           </div>
 
           <div className="space-y-2">
-            {/* Record 0: Latest Homework Task */}
+            {/* Record 0: Latest Work Report */}
+            {myWorkReports.length > 0 && (
+              <div
+                onClick={() => setIsWorkReportHistoryModalOpen(true)}
+                className="p-3 bg-teal-50/70 hover:bg-teal-100/70 border border-teal-100 rounded-2xl flex items-center justify-between text-xs cursor-pointer transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${
+                    myWorkReports[0].status === 'ACKNOWLEDGED'
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      : 'bg-teal-100 text-teal-800 border-teal-300'
+                  }`}>
+                    {myWorkReports[0].status === 'ACKNOWLEDGED' ? 'مدیر مشاهده و تایید کرد' : 'ثبت شد در پرونده'}
+                  </span>
+                  {myWorkReports[0].hoursSpent && (
+                    <span className="font-mono text-[10px] text-teal-700 font-bold">
+                      {myWorkReports[0].hoursSpent} ساعت کار
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="text-right">
+                    <span className="font-bold text-slate-800 block">گزارش کاری: {myWorkReports[0].title}</span>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      {myWorkReports[0].date}
+                    </span>
+                  </div>
+                  <div className="w-7 h-7 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center shrink-0">
+                    <BookOpen className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Record 0.5: Latest Homework Task */}
             {myHomeworkTasks.length > 0 && (
               <div
                 onClick={() => setIsHomeworkHistoryModalOpen(true)}
@@ -2522,10 +2588,28 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
                       )}
                       {sal.bonusesTotal > 0 && (
                         <div className="flex justify-between text-emerald-600 font-medium">
-                          <span>پاداش تشویقی:</span>
+                          <span>پاداش تشویقی و مزایا:</span>
                           <span className="font-mono">+{formatCurrencyTomans(sal.bonusesTotal)}</span>
                         </div>
                       )}
+                      {(sal as any).eydiTotal && (sal as any).eydiTotal > 0 ? (
+                        <div className="flex justify-between text-emerald-700 font-semibold bg-emerald-50/70 px-2 py-1 rounded-lg">
+                          <span>عیدی و پاداش مصوب پایان سال:</span>
+                          <span className="font-mono">+{formatCurrencyTomans((sal as any).eydiTotal)}</span>
+                        </div>
+                      ) : null}
+                      {(sal as any).rewardTotal && (sal as any).rewardTotal > 0 ? (
+                        <div className="flex justify-between text-teal-700 font-semibold bg-teal-50/70 px-2 py-1 rounded-lg">
+                          <span>پاداش عملکرد و بهره‌وری:</span>
+                          <span className="font-mono">+{formatCurrencyTomans((sal as any).rewardTotal)}</span>
+                        </div>
+                      ) : null}
+                      {(sal as any).shoppingVoucherTotal && (sal as any).shoppingVoucherTotal > 0 ? (
+                        <div className="flex justify-between text-amber-700 font-semibold bg-amber-50/70 px-2 py-1 rounded-lg">
+                          <span>بن خرید کارگاهی / کمک‌هزینه رفاهی:</span>
+                          <span className="font-mono">+{formatCurrencyTomans((sal as any).shoppingVoucherTotal)}</span>
+                        </div>
+                      ) : null}
                       {sal.homeworkWagesTotal && sal.homeworkWagesTotal > 0 ? (
                         <div className="flex justify-between text-purple-700 font-semibold bg-purple-50/70 px-2 py-1 rounded-lg">
                           <span>دستمزد کار در منزل / کارمزدی:</span>
@@ -2583,6 +2667,293 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
                 type="button"
                 onClick={() => setIsPayslipsModalOpen(false)}
                 className="px-5 py-2.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer"
+              >
+                بستن
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* OPTIONAL DAILY WORK REPORT SUBMISSION MODAL */}
+      {isWorkReportModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in"
+          onClick={() => setIsWorkReportModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 border border-slate-200 shadow-2xl animate-in zoom-in-95 text-right cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <button
+                type="button"
+                onClick={() => setIsWorkReportModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800">
+                  اختیاری
+                </span>
+                <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+                  <span>ثبت گزارش کاری روزانه</span>
+                  <BookOpen className="w-4 h-4 text-teal-600" />
+                </h3>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-500 leading-relaxed bg-teal-50/60 p-3 rounded-2xl border border-teal-100">
+              این گزارش کاملاً اختیاری است و برای ثبت سوابق، پیشرفت تولید و فعالیت‌های روزانه شما در پرونده پرسنلی ذخیره می‌شود تا مدیر ارشد و مدیر منابع انسانی در جریان عملکرد شما قرار گیرند.
+            </p>
+
+            {reportMsg && (
+              <div
+                className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+                  reportMsg.success
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                    : 'bg-rose-50 text-rose-800 border border-rose-200'
+                }`}
+              >
+                {reportMsg.success ? <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" /> : <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />}
+                <span>{reportMsg.text}</span>
+              </div>
+            )}
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!currentEmployee) return;
+                if (!reportTitle.trim() || !reportContent.trim()) {
+                  setReportMsg({ success: false, text: 'عنوان و شرح گزارش الزامی است.' });
+                  return;
+                }
+                setIsSubmittingReport(true);
+                const res = StorageService.submitWorkReport({
+                  employeeId: currentEmployee.id,
+                  title: reportTitle.trim(),
+                  content: reportContent.trim(),
+                  date: reportDate,
+                  hoursSpent: reportHours ? Number(reportHours) : undefined,
+                  tags: [reportTag],
+                });
+                setIsSubmittingReport(false);
+                setReportMsg({ success: res.success, text: res.message });
+                if (res.success) {
+                  setReportTitle('');
+                  setReportContent('');
+                  setReportHours('');
+                  setTimeout(() => {
+                    setIsWorkReportModalOpen(false);
+                    setReportMsg(null);
+                  }, 1200);
+                }
+              }}
+              className="space-y-3.5 text-xs"
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    تاریخ فعالیت:
+                  </label>
+                  <input
+                    type="text"
+                    value={reportDate}
+                    onChange={(e) => setReportDate(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 font-mono text-center outline-none focus:border-teal-600"
+                    placeholder="1405/07/15"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    بخش / دسته‌بندی کار:
+                  </label>
+                  <select
+                    value={reportTag}
+                    onChange={(e) => setReportTag(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 outline-none focus:border-teal-600 bg-white"
+                  >
+                    <option value="تولید و ماشین‌کاری">تولید و ماشین‌کاری</option>
+                    <option value="مونتاژ و اتصالات">مونتاژ و اتصالات</option>
+                    <option value="سنباده‌زنی و پرداخت">سنباده‌زنی و پرداخت</option>
+                    <option value="رنگ‌کاری و پلی‌استر">رنگ‌کاری و پلی‌استر</option>
+                    <option value="بسته‌بندی و انبار">بسته‌بندی و انبار</option>
+                    <option value="کنترل کیفیت">کنترل کیفیت</option>
+                    <option value="امور اداری و دفتری">امور اداری و دفتری</option>
+                    <option value="فنی و تعمیرات">فنی و تعمیرات</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  عنوان خلاصه کار: <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={reportTitle}
+                  onChange={(e) => setReportTitle(e.target.value)}
+                  placeholder="مثال: مونتاژ بدنه ۲۰ تخته نرد گردو و رفع ایراد لولاها"
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 outline-none focus:border-teal-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  شرح کامل فعالیت‌ها و اقدامات: <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  value={reportContent}
+                  onChange={(e) => setReportContent(e.target.value)}
+                  placeholder="توضیح دهید در طول روز چه کارهایی انجام دادید، چه قطعاتی تولید شد، یا با چه موانعی روبه‌رو شدید..."
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 outline-none focus:border-teal-600 leading-relaxed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  مدت زمان صرف‌شده به ساعت (اختیاری):
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  max="16"
+                  value={reportHours}
+                  onChange={(e) => setReportHours(e.target.value === '' ? '' : Number(e.target.value))}
+                  placeholder="مثال: 7.5"
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 outline-none focus:border-teal-600 font-mono"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsWorkReportHistoryModalOpen(true)}
+                  className="text-xs text-teal-700 font-bold hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>مشاهده سوابق گزارش‌های من ({myWorkReports.length})</span>
+                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsWorkReportModalOpen(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                  >
+                    انصراف
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingReport}
+                    className="px-5 py-2.5 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white shadow-xs cursor-pointer transition-colors"
+                  >
+                    {isSubmittingReport ? 'در حال ثبت...' : 'ثبت گزارش'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* WORK REPORT HISTORY MODAL */}
+      {isWorkReportHistoryModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in"
+          onClick={() => setIsWorkReportHistoryModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-xl w-full max-h-[85vh] flex flex-col p-6 space-y-4 border border-slate-200 shadow-2xl animate-in zoom-in-95 text-right cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <button
+                type="button"
+                onClick={() => setIsWorkReportHistoryModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+                <span>سوابق گزارش‌های کاری من ({myWorkReports.length})</span>
+                <BookOpen className="w-4 h-4 text-teal-600" />
+              </h3>
+            </div>
+
+            <div className="overflow-y-auto space-y-3 flex-1 pr-1">
+              {myWorkReports.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 text-xs">
+                  تاکنون هیچ گزارش کاری ثبت نکرده‌اید.
+                </div>
+              ) : (
+                myWorkReports.map((rep) => (
+                  <div
+                    key={rep.id}
+                    className="p-4 bg-slate-50 hover:bg-slate-100/70 border border-slate-200/80 rounded-2xl space-y-2 text-xs transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${
+                          rep.status === 'ACKNOWLEDGED'
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                            : 'bg-teal-100 text-teal-800 border-teal-300'
+                        }`}>
+                          {rep.status === 'ACKNOWLEDGED' ? 'رویت و تایید مدیر' : 'ثبت شده در پرونده'}
+                        </span>
+                        {rep.tags && rep.tags.length > 0 && (
+                          <span className="text-[10px] px-2 py-0.5 bg-slate-200 text-slate-700 rounded-md">
+                            {rep.tags[0]}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[11px] font-mono text-slate-500 font-bold">{rep.date}</span>
+                    </div>
+
+                    <h4 className="font-bold text-slate-900 text-xs sm:text-sm">{rep.title}</h4>
+                    <p className="text-slate-700 leading-relaxed whitespace-pre-wrap text-[11px] bg-white p-3 rounded-xl border border-slate-100">
+                      {rep.content}
+                    </p>
+
+                    {rep.hoursSpent && (
+                      <div className="text-[10px] text-teal-700 font-bold">
+                        ⏱️ مدت کار ثبت‌شده: {rep.hoursSpent} ساعت
+                      </div>
+                    )}
+
+                    {rep.adminFeedback && (
+                      <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 space-y-1">
+                        <div className="font-bold flex items-center justify-between">
+                          <span>دستور و نظر مدیر:</span>
+                          <span className="text-[10px] text-amber-700">{rep.feedbackBy || 'مدیریت'}</span>
+                        </div>
+                        <p>{rep.adminFeedback}</p>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex justify-between items-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsWorkReportHistoryModalOpen(false);
+                  setIsWorkReportModalOpen(true);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white cursor-pointer"
+              >
+                ثبت گزارش جدید
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsWorkReportHistoryModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer"
               >
                 بستن
               </button>

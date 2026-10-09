@@ -120,6 +120,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     taxExemptionThreshold: settings.taxExemptionThreshold ?? 14000000,
     fixedHousingAllowance: settings.fixedHousingAllowance ?? 900000,
     fixedGroceryAllowance: settings.fixedGroceryAllowance ?? 1400000,
+    defaultEydiAmount: settings.defaultEydiAmount ?? 10000000,
+    defaultYearlyBonusAmount: settings.defaultYearlyBonusAmount ?? 3000000,
+    defaultShoppingVoucherAmount: settings.defaultShoppingVoucherAmount ?? 2000000,
     workshops: settings.workshops && settings.workshops.length > 0 ? settings.workshops : [
       {
         id: 'ws_1',
@@ -875,6 +878,51 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 />
                 <span className="text-[11px] text-slate-400 mt-1 block">
                   در صورت درج ۰، در فیش حقوقی نمایش داده نخواهد شد
+                </span>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  عیدی مصوب سالانه پیش‌فرض (تومان)
+                </label>
+                <input
+                  type="number"
+                  disabled={!canEdit}
+                  value={formData.defaultEydiAmount || 0}
+                  onChange={(e) => setFormData({ ...formData, defaultEydiAmount: Number(e.target.value) })}
+                  className="w-full text-xs p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono font-bold"
+                />
+                <span className="text-[11px] text-slate-400 mt-1 block">
+                  قابل اعمال موردی یا همگانی برای پرسنل در پایان سال
+                </span>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  پاداش عملکرد و بهره‌وری پیش‌فرض (تومان)
+                </label>
+                <input
+                  type="number"
+                  disabled={!canEdit}
+                  value={formData.defaultYearlyBonusAmount || 0}
+                  onChange={(e) => setFormData({ ...formData, defaultYearlyBonusAmount: Number(e.target.value) })}
+                  className="w-full text-xs p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono font-bold"
+                />
+                <span className="text-[11px] text-slate-400 mt-1 block">
+                  پاداش ویژه تشویقی و انگیزشی
+                </span>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  بن خرید کارگاهی / کمک‌هزینه رفاهی (تومان)
+                </label>
+                <input
+                  type="number"
+                  disabled={!canEdit}
+                  value={formData.defaultShoppingVoucherAmount || 0}
+                  onChange={(e) => setFormData({ ...formData, defaultShoppingVoucherAmount: Number(e.target.value) })}
+                  className="w-full text-xs p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono font-bold"
+                />
+                <span className="text-[11px] text-slate-400 mt-1 block">
+                  بن خرید، کارت هدیه یا کمک‌هزینه رفاهی پرسنل
                 </span>
               </div>
             </div>

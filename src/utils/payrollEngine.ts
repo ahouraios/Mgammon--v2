@@ -258,11 +258,20 @@ export function calculatePayroll(input: PayrollCalculationInput): PayrollCalcula
       } else if (att.status === 'PRESENT' || att.status === 'LATE' || att.status === 'EARLY_LEAVE') {
         presentDaysCount++;
         workedDaysCount++;
-        const duration = typeof att.workDurationMinutes === 'number' && att.workDurationMinutes > 0
+        // If manager approved full day credit despite early leave or early departure
+        const isManagerFullDay = att.isManagerCreditFullDay === true || att.notes?.includes('محاسبه تمام‌وقت به دستور مدیر');
+        let duration = typeof att.workDurationMinutes === 'number' && att.workDurationMinutes > 0
           ? att.workDurationMinutes
           : 0;
 
-        if (att.checkInTime && (!att.checkOutTime || att.checkOutTime === '') && duration === 0) {
+        if (isManagerFullDay) {
+          const standardMins = standardDailyHours * 60;
+          if (duration < standardMins) {
+            duration = standardMins;
+          }
+        }
+
+        if (att.checkInTime && (!att.checkOutTime || att.checkOutTime === '') && duration === 0 && !isManagerFullDay) {
           incompleteDaysCount++;
         }
 
@@ -325,9 +334,23 @@ export function calculatePayroll(input: PayrollCalculationInput): PayrollCalcula
   const totalAdvances = approvedAdvances + discretionaryAdvances;
 
   // 3. BONUSES & DISCIPLINARY PENALTIES (پاداش و جریمه انضباطی)
-  const bonuses = bonusesPenalties
+  const regularBonuses = bonusesPenalties
     .filter(b => b.employeeId === emp.id && b.type === 'BONUS' && (b.month?.replace(/-/g, '/') === normMonth))
     .reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
+
+  const eydiTotal = bonusesPenalties
+    .filter(b => b.employeeId === emp.id && b.type === 'EYDI' && (b.month?.replace(/-/g, '/') === normMonth))
+    .reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
+
+  const rewardTotal = bonusesPenalties
+    .filter(b => b.employeeId === emp.id && b.type === 'REWARD' && (b.month?.replace(/-/g, '/') === normMonth))
+    .reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
+
+  const shoppingVoucherTotal = bonusesPenalties
+    .filter(b => b.employeeId === emp.id && b.type === 'SHOPPING_VOUCHER' && (b.month?.replace(/-/g, '/') === normMonth))
+    .reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
+
+  const bonuses = regularBonuses + eydiTotal + rewardTotal + shoppingVoucherTotal;
 
   const disciplinaryPenalties = bonusesPenalties
     .filter(b => b.employeeId === emp.id && b.type === 'PENALTY' && (b.month?.replace(/-/g, '/') === normMonth))
@@ -413,6 +436,9 @@ export function calculatePayroll(input: PayrollCalculationInput): PayrollCalcula
     overtimeHours,
     overtimeAmount,
     bonusesTotal: bonuses,
+    eydiTotal,
+    rewardTotal,
+    shoppingVoucherTotal,
     penaltiesTotal: penalties,
     advancesTotal: totalAdvances,
     discretionaryAdvancesTotal: discretionaryAdvances,

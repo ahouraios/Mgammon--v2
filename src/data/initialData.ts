@@ -82,6 +82,9 @@ export const initialCompanySettings: CompanySettings = {
   fixedHousingAllowance: 900000,
   fixedGroceryAllowance: 1400000,
   childAllowance: 0,
+  defaultEydiAmount: 10000000,
+  defaultYearlyBonusAmount: 3000000,
+  defaultShoppingVoucherAmount: 2000000,
   jobCategories: ['مدیر داخلی', 'مسئول فنی', 'نیروی کارگاهی'],
 };
 

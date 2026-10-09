@@ -222,6 +222,9 @@ export interface AttendanceRecord {
   isMission?: boolean; // نشانگر وضعیت مأموریت روزانه
   missionDestination?: string; // مقصد مأموریت اول وقت یا روزانه
   missionDescription?: string; // شرح مأموریت
+  isMissionDescription?: string;
+  isManagerCreditFullDay?: boolean; // محاسبه تمام‌وقت به دستور مدیر علی‌رغم خروج زودهنگام
+  managerCreditReason?: string; // علت ثبت کارکرد کامل توسط مدیر
   verifiedLocation?: {
     lat: number;
     lng: number;
@@ -229,7 +232,7 @@ export interface AttendanceRecord {
   };
 }
 
-export type LeaveType = 'EARNED' | 'HOURLY' | 'UNPAID' | 'MEDICAL';
+export type LeaveType = 'EARNED' | 'HOURLY' | 'UNPAID' | 'MEDICAL' | 'INCENTIVE' | 'SPECIAL';
 export type RequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface LeaveRequest {
@@ -350,7 +353,7 @@ export interface WorkMission {
   createdBy?: string;
 }
 
-export type ManagerAdjustmentType = 'BONUS' | 'PENALTY' | 'DISCRETIONARY_ADVANCE';
+export type ManagerAdjustmentType = 'BONUS' | 'PENALTY' | 'DISCRETIONARY_ADVANCE' | 'EYDI' | 'REWARD' | 'SHOPPING_VOUCHER';
 
 export interface BonusOrPenalty {
   id: string;
@@ -366,6 +369,26 @@ export interface BonusOrPenalty {
   createdBy?: string;
 }
 
+// گزارش کاری روزانه پرسنل (ثبت اختیاری گزارش کار و فعالیت‌های روزانه)
+export interface WorkReport {
+  id: string;
+  companyId: string;
+  employeeId: string;
+  employeeName: string;
+  date: string; // تاریخ شمسی e.g. 1405/07/15
+  title: string; // عنوان گزارش یا خلاصه فعالیت
+  content: string; // شرح فعالیت‌های انجام‌شده
+  hoursSpent?: number; // مدت زمان صرف‌شده به ساعت
+  tags?: string[]; // برچسب‌ها مثلاً تولید، مونتاژ، بسته‌بندی، فنی، اداری
+  status: 'SUBMITTED' | 'SEEN' | 'ACKNOWLEDGED';
+  seenBy?: string;
+  seenAt?: string;
+  adminFeedback?: string; // یادداشت یا بازخورد مدیر ارشد یا مدیر منابع انسانی
+  feedbackBy?: string;
+  feedbackAt?: string;
+  createdAt: string;
+}
+
 export interface SalaryRecord {
   id: string;
   companyId: string;
@@ -377,6 +400,9 @@ export interface SalaryRecord {
   overtimeHours: number;
   overtimeAmount: number;
   bonusesTotal: number;
+  eydiTotal?: number; // عیدی مصوب مدیریتی
+  rewardTotal?: number; // پاداش عملکردی
+  shoppingVoucherTotal?: number; // بن خرید کارگاهی / رفاهی
   penaltiesTotal: number;
   advancesTotal: number;
   discretionaryAdvancesTotal?: number; // مساعده خارج از چارچوب مدیریتی
@@ -489,6 +515,9 @@ export interface CompanySettings {
   fixedHousingAllowance: number;
   fixedGroceryAllowance: number;
   childAllowance: number;
+  defaultEydiAmount?: number; // مبلغ پیش‌فرض عیدی مصوب سالانه (تومان)
+  defaultYearlyBonusAmount?: number; // پاداش مصوب تشویقی / عملکرد (تومان)
+  defaultShoppingVoucherAmount?: number; // بن خرید کارگاهی / کمک‌هزینه رفاهی (تومان)
   jobCategories?: string[]; // دسته‌بندی‌های شغلی کارگاه تخته‌نرد
   // 5. زنگ و آلارم کارگاه (پیشنهاد ۴: همگام‌سازی انتخابی با شیفت)
   autoShiftAlarmsEnabled?: boolean;

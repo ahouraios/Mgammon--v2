@@ -100,6 +100,18 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
     .filter((b) => b.type === 'BONUS')
     .reduce((sum, b) => sum + b.amount, 0);
 
+  const currentMonthEydi = currentMonthAdjustments
+    .filter((b) => b.type === 'EYDI')
+    .reduce((sum, b) => sum + b.amount, 0);
+
+  const currentMonthRewards = currentMonthAdjustments
+    .filter((b) => b.type === 'REWARD')
+    .reduce((sum, b) => sum + b.amount, 0);
+
+  const currentMonthVouchers = currentMonthAdjustments
+    .filter((b) => b.type === 'SHOPPING_VOUCHER')
+    .reduce((sum, b) => sum + b.amount, 0);
+
   const currentMonthDiscretionaryAdvances = currentMonthAdjustments
     .filter((b) => b.type === 'DISCRETIONARY_ADVANCE' || (b as any).type === 'EXTRA_ADVANCE')
     .reduce((sum, b) => sum + b.amount, 0);
@@ -147,6 +159,31 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
     const settings = StorageService.getSettings();
     const today = getTodayShamsiDetailed().dateString;
 
+    if (bpForm.employeeId === 'ALL_EMPLOYEES') {
+      // Distribute adjustment to all employees
+      employees.forEach((emp) => {
+        StorageService.addBonusOrPenalty({
+          id: `bp_${Date.now()}_${emp.id}_${Math.random().toString(36).substring(2, 5)}`,
+          companyId: settings.id,
+          employeeId: emp.id,
+          type: bpForm.type,
+          amount: Math.round(Number(bpForm.amount)),
+          title: bpForm.title.trim(),
+          description: bpForm.description?.trim(),
+          date: today,
+          month: bpForm.month,
+          createdBy: currentUser.name || currentUser.username,
+          createdAt: new Date().toISOString(),
+        });
+        StorageService.calculateSalaryForEmployee(emp.id, bpForm.month);
+      });
+      setIsBonusPenaltyModalOpen(false);
+      onRefresh();
+      setActionMessage(`✓ آیتم انتخابی با موفقیت برای تمامی ${employees.length} پرسنل ثبت و در حقوق ماه ${bpForm.month} محاسبه شد.`);
+      setTimeout(() => setActionMessage(null), 4000);
+      return;
+    }
+
     StorageService.addBonusOrPenalty({
       id: `bp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       companyId: settings.id,
@@ -166,7 +203,13 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
     setIsBonusPenaltyModalOpen(false);
     onRefresh();
     setActionMessage(
-      bpForm.type === 'BONUS'
+      bpForm.type === 'EYDI'
+        ? '✓ عیدی مصوب پایان سال ثبت شد و در فیش حقوقی دوره منظور گردید.'
+        : bpForm.type === 'REWARD'
+        ? '✓ پاداش عملکرد و بهره‌وری با موفقیت ثبت و به حقوق اضافه گردید.'
+        : bpForm.type === 'SHOPPING_VOUCHER'
+        ? '✓ بن خرید کارگاهی / کمک‌هزینه رفاهی ثبت شد و به فیش حقوقی افزوده گردید.'
+        : bpForm.type === 'BONUS'
         ? '✓ پاداش تشویقی با موفقیت ثبت شد و به حقوق اضافه گردید.'
         : bpForm.type === 'DISCRETIONARY_ADVANCE'
         ? '✓ مساعده خارج از چارچوب ثبت شد و از خالص حقوق دوره کسر گردید.'
@@ -425,18 +468,33 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
                           <td className="py-3 px-4">
                             <span
                               className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
-                                adj.type === 'BONUS'
+                                adj.type === 'EYDI'
+                                  ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                  : adj.type === 'REWARD'
+                                  ? 'bg-teal-50 text-teal-800 border border-teal-200'
+                                  : adj.type === 'SHOPPING_VOUCHER'
+                                  ? 'bg-orange-50 text-orange-800 border border-orange-200'
+                                  : adj.type === 'BONUS'
                                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                   : adj.type === 'DISCRETIONARY_ADVANCE'
                                   ? 'bg-purple-50 text-purple-700 border border-purple-200'
                                   : 'bg-rose-50 text-rose-700 border border-rose-200'
                               }`}
                             >
+                              {adj.type === 'EYDI' && <Gift className="w-3 h-3" />}
+                              {adj.type === 'REWARD' && <TrendingUp className="w-3 h-3" />}
+                              {adj.type === 'SHOPPING_VOUCHER' && <Coins className="w-3 h-3" />}
                               {adj.type === 'BONUS' && <TrendingUp className="w-3 h-3" />}
                               {adj.type === 'DISCRETIONARY_ADVANCE' && <Coins className="w-3 h-3" />}
                               {adj.type === 'PENALTY' && <TrendingDown className="w-3 h-3" />}
                               <span>
-                                {adj.type === 'BONUS'
+                                {adj.type === 'EYDI'
+                                  ? 'عیدی مصوب سالانه (+)'
+                                  : adj.type === 'REWARD'
+                                  ? 'پاداش عملکرد و بهره‌وری (+)'
+                                  : adj.type === 'SHOPPING_VOUCHER'
+                                  ? 'بن خرید کارگاهی (+)'
+                                  : adj.type === 'BONUS'
                                   ? 'پاداش تشویقی (+)'
                                   : adj.type === 'DISCRETIONARY_ADVANCE'
                                   ? 'مساعده خارج از چارچوب (-)'
@@ -446,10 +504,10 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
                           </td>
                           <td
                             className={`py-3 px-4 font-mono font-bold text-sm ${
-                              adj.type === 'BONUS' ? 'text-emerald-600' : 'text-rose-600'
+                              adj.type === 'PENALTY' || adj.type === 'DISCRETIONARY_ADVANCE' ? 'text-rose-600' : 'text-emerald-600'
                             }`}
                           >
-                            {adj.type === 'BONUS' ? '+' : '-'}{formatCurrencyTomans(adj.amount)}
+                            {adj.type === 'PENALTY' || adj.type === 'DISCRETIONARY_ADVANCE' ? '-' : '+'}{formatCurrencyTomans(adj.amount)}
                           </td>
                           <td className="py-3 px-4 font-semibold text-slate-800">
                             {adj.title}
@@ -815,6 +873,30 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
                         </span>
                       </div>
                     )}
+                    {viewingPayslip.eydiTotal && viewingPayslip.eydiTotal > 0 ? (
+                      <div className="flex justify-between py-1 border-b border-slate-100 text-emerald-700 font-bold bg-emerald-50/70 px-2 rounded-lg">
+                        <span>عیدی مصوب پایان سال:</span>
+                        <span className="font-mono">
+                          +{formatCurrencyTomans(viewingPayslip.eydiTotal)}
+                        </span>
+                      </div>
+                    ) : null}
+                    {viewingPayslip.rewardTotal && viewingPayslip.rewardTotal > 0 ? (
+                      <div className="flex justify-between py-1 border-b border-slate-100 text-teal-700 font-bold bg-teal-50/70 px-2 rounded-lg">
+                        <span>پاداش بهره‌وری و حسن انجام کار:</span>
+                        <span className="font-mono">
+                          +{formatCurrencyTomans(viewingPayslip.rewardTotal)}
+                        </span>
+                      </div>
+                    ) : null}
+                    {viewingPayslip.shoppingVoucherTotal && viewingPayslip.shoppingVoucherTotal > 0 ? (
+                      <div className="flex justify-between py-1 border-b border-slate-100 text-amber-700 font-bold bg-amber-50/70 px-2 rounded-lg">
+                        <span>بن خرید کارگاهی / کمک‌هزینه رفاهی:</span>
+                        <span className="font-mono">
+                          +{formatCurrencyTomans(viewingPayslip.shoppingVoucherTotal)}
+                        </span>
+                      </div>
+                    ) : null}
                     {viewingPayslip.personalCardExpensesTotal && viewingPayslip.personalCardExpensesTotal > 0 ? (
                       <div className="flex justify-between py-1 border-b border-slate-100 text-indigo-700 font-bold bg-indigo-50/60 px-1.5 py-1 rounded-lg">
                         <span>هزینه پرداخت‌شده از کارت شخصی کارگر:</span>
@@ -1014,13 +1096,20 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
             </div>
 
             <form onSubmit={handleAddBonusPenalty} className="p-6 space-y-4">
-              {/* Type Selection - 3 Clean Cards */}
+              {/* Type Selection - 6 Clean Cards */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">نوع تعدیل مدیریتی:</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">نوع تعدیل مدیریتی / مزایای رفاهی:</label>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
-                    onClick={() => setBpForm({ ...bpForm, type: 'BONUS' })}
+                    onClick={() => {
+                      const settings = StorageService.getSettings();
+                      setBpForm({
+                        ...bpForm,
+                        type: 'BONUS',
+                        title: bpForm.title || 'پاداش تشویقی و حسن انجام کار',
+                      });
+                    }}
                     className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
                       bpForm.type === 'BONUS'
                         ? 'bg-emerald-50 border-emerald-500 text-emerald-900 ring-2 ring-emerald-500/20 shadow-xs'
@@ -1034,7 +1123,73 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setBpForm({ ...bpForm, type: 'DISCRETIONARY_ADVANCE' })}
+                    onClick={() => {
+                      const settings = StorageService.getSettings();
+                      setBpForm({
+                        ...bpForm,
+                        type: 'EYDI',
+                        amount: settings.defaultEydiAmount || 10000000,
+                        title: 'عیدی و پاداش پایان سال مصوب',
+                      });
+                    }}
+                    className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                      bpForm.type === 'EYDI'
+                        ? 'bg-amber-50 border-amber-500 text-amber-900 ring-2 ring-amber-500/20 shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Gift className={`w-4 h-4 ${bpForm.type === 'EYDI' ? 'text-amber-600' : 'text-slate-400'}`} />
+                    <span className="text-xs font-bold">عیدی سالانه</span>
+                    <span className="text-[10px] text-amber-700 font-normal">عیدی مصوب (+)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const settings = StorageService.getSettings();
+                      setBpForm({
+                        ...bpForm,
+                        type: 'REWARD',
+                        amount: settings.defaultYearlyBonusAmount || 3000000,
+                        title: 'پاداش عملکرد و بهره‌وری کارگاهی',
+                      });
+                    }}
+                    className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                      bpForm.type === 'REWARD'
+                        ? 'bg-teal-50 border-teal-500 text-teal-900 ring-2 ring-teal-500/20 shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <TrendingUp className={`w-4 h-4 ${bpForm.type === 'REWARD' ? 'text-teal-600' : 'text-slate-400'}`} />
+                    <span className="text-xs font-bold">پاداش عملکرد</span>
+                    <span className="text-[10px] text-teal-700 font-normal">بهره‌وری ویژه (+)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const settings = StorageService.getSettings();
+                      setBpForm({
+                        ...bpForm,
+                        type: 'SHOPPING_VOUCHER',
+                        amount: settings.defaultShoppingVoucherAmount || 2000000,
+                        title: 'بن خرید کارگاهی / کمک‌هزینه رفاهی',
+                      });
+                    }}
+                    className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                      bpForm.type === 'SHOPPING_VOUCHER'
+                        ? 'bg-orange-50 border-orange-500 text-orange-900 ring-2 ring-orange-500/20 shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Coins className={`w-4 h-4 ${bpForm.type === 'SHOPPING_VOUCHER' ? 'text-orange-600' : 'text-slate-400'}`} />
+                    <span className="text-xs font-bold">بن خرید</span>
+                    <span className="text-[10px] text-orange-700 font-normal">کمک‌هزینه رفاهی (+)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setBpForm({ ...bpForm, type: 'DISCRETIONARY_ADVANCE', title: bpForm.title || 'مساعده فوری خارج از سقف' })}
                     className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
                       bpForm.type === 'DISCRETIONARY_ADVANCE'
                         ? 'bg-purple-50 border-purple-500 text-purple-900 ring-2 ring-purple-500/20 shadow-xs'
@@ -1048,7 +1203,7 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setBpForm({ ...bpForm, type: 'PENALTY' })}
+                    onClick={() => setBpForm({ ...bpForm, type: 'PENALTY', title: bpForm.title || 'جریمه انضباطی' })}
                     className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
                       bpForm.type === 'PENALTY'
                         ? 'bg-rose-50 border-rose-500 text-rose-900 ring-2 ring-rose-500/20 shadow-xs'
@@ -1064,12 +1219,33 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
 
               {/* Informative Callout for Selected Type */}
               <div className={`p-2.5 rounded-xl text-[11px] leading-relaxed border ${
-                bpForm.type === 'BONUS'
+                bpForm.type === 'EYDI'
+                  ? 'bg-amber-50/70 border-amber-200 text-amber-900'
+                  : bpForm.type === 'REWARD'
+                  ? 'bg-teal-50/70 border-teal-200 text-teal-900'
+                  : bpForm.type === 'SHOPPING_VOUCHER'
+                  ? 'bg-orange-50/70 border-orange-200 text-orange-900'
+                  : bpForm.type === 'BONUS'
                   ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
                   : bpForm.type === 'DISCRETIONARY_ADVANCE'
                   ? 'bg-purple-50/70 border-purple-200 text-purple-900'
                   : 'bg-rose-50/70 border-rose-200 text-rose-900'
               }`}>
+                {bpForm.type === 'EYDI' && (
+                  <p>
+                    <strong>عیدی پایان سال:</strong> مبلغ عیدی مصوب قانون کار یا مدیریت است که می‌توانید برای یک پرسنل یا تمامی پرسنل به شکل همگانی اعمال نمایید.
+                  </p>
+                )}
+                {bpForm.type === 'REWARD' && (
+                  <p>
+                    <strong>پاداش عملکرد و بهره‌وری:</strong> پاداش ویژه بابت کیفیت کار، سرعت در تحویل سفارشات یا اضافه کارکرد انگیزشی که به ناخالص دریافتی افزوده می‌شود.
+                  </p>
+                )}
+                {bpForm.type === 'SHOPPING_VOUCHER' && (
+                  <p>
+                    <strong>بن خرید کارگاهی / کمک‌هزینه رفاهی:</strong> کمک‌هزینه معیشتی، بن خرید کالا، یا کارت هدیه برای پرسنل که در فیش حقوقی در ردیف مزایا منظور می‌گردد.
+                  </p>
+                )}
                 {bpForm.type === 'BONUS' && (
                   <p>
                     <strong>اثر حسابداری:</strong> این مبلغ به عنوان پاداش تشویقی و حق‌الزحمه ویژه به حقوق ناخالص افزوده شده و دریافتی نهایی پرسنل را افزایش می‌دهد.
@@ -1096,6 +1272,9 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
                     onChange={(e) => setBpForm({ ...bpForm, employeeId: e.target.value })}
                     className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 bg-white"
                   >
+                    <option value="ALL_EMPLOYEES" className="font-bold text-indigo-700">
+                      ★ همه پرسنل (پرداخت همگانی / عیدی / بن خرید)
+                    </option>
                     {employees.map((emp) => (
                       <option key={emp.id} value={emp.id}>
                         {emp.firstName} {emp.lastName} ({emp.department})

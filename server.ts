@@ -179,6 +179,7 @@ interface DatabaseSchema {
   bonusesPenalties?: any[];
   homeworkTasks?: any[];
   calendarEvents?: any[];
+  workReports?: any[];
   auditLogs: any[];
   messages: any[];
   alarms?: any[];
@@ -310,6 +311,7 @@ function loadInitialDb(): DatabaseSchema {
     bonusesPenalties: [],
     homeworkTasks: [],
     calendarEvents: [],
+    workReports: [],
     auditLogs: [
       {
         id: 'log_launch',
@@ -2405,6 +2407,117 @@ app.delete('/api/calendar/events/:id', requireRole('ADMIN', 'MANAGER'), (req: Re
   res.json({ success: true, message: 'رویداد تقویم با موفقیت حذف شد.' });
 });
 
+// ==========================================
+// WORK REPORTS (گزارش‌های کاری پرسنل) APIS
+// ==========================================
+app.get('/api/work-reports', requireAuth, (req: Request, res: Response) => {
+  const user = (req as any).user;
+  if (!db.workReports) db.workReports = [];
+
+  if (user?.role === 'EMPLOYEE' && user?.employeeId) {
+    const myReports = db.workReports.filter((r: any) => r.employeeId === user.employeeId);
+    return res.json({ success: true, reports: myReports });
+  }
+
+  // Admin / HR Manager / Workshop Manager can see all reports
+  res.json({ success: true, reports: db.workReports });
+});
+
+app.post('/api/work-reports', requireAuth, (req: Request, res: Response) => {
+  const user = (req as any).user;
+  const { employeeId, title, content, date, hoursSpent, tags } = req.body;
+  if (!employeeId || !title || !content) {
+    return res.status(400).json({ success: false, message: 'شناسه کارمند، عنوان و شرح گزارش الزامی است.' });
+  }
+
+  const emp = db.employees.find((e: any) => e.id === employeeId);
+  const employeeName = emp ? `${emp.firstName} ${emp.lastName}` : (user?.name || 'پرسنل');
+
+  const newReport = {
+    id: `wr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    companyId: db.settings?.id || 'comp_mgommon_01',
+    employeeId,
+    employeeName,
+    date: date || new Date().toISOString().slice(0, 10),
+    title: String(title).trim(),
+    content: String(content).trim(),
+    hoursSpent: hoursSpent ? Number(hoursSpent) : undefined,
+    tags: Array.isArray(tags) ? tags : [],
+    status: 'SUBMITTED',
+    createdAt: new Date().toISOString()
+  };
+
+  if (!db.workReports) db.workReports = [];
+  db.workReports.unshift(newReport);
+  persistDb();
+
+  logServerAudit(
+    user?.id || 'usr_emp',
+    employeeName,
+    'ثبت گزارش کاری',
+    'گزارش‌های کاری پرسنل',
+    `ثبت گزارش "${newReport.title}" برای تاریخ ${newReport.date}`,
+    req.ip
+  );
+
+  res.json({ success: true, report: newReport });
+});
+
+app.put('/api/work-reports/:id/feedback', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { feedback, reviewerName } = req.body;
+  const user = (req as any).user;
+
+  if (!db.workReports) db.workReports = [];
+  const report = db.workReports.find((r: any) => r.id === id);
+  if (!report) {
+    return res.status(404).json({ success: false, message: 'گزارش کاری یافت نشد.' });
+  }
+
+  report.status = 'ACKNOWLEDGED';
+  report.seenBy = reviewerName || user?.name || 'مدیریت';
+  report.seenAt = new Date().toISOString();
+  report.adminFeedback = feedback ? String(feedback).trim() : undefined;
+  report.feedbackBy = reviewerName || user?.name || 'مدیریت';
+  report.feedbackAt = new Date().toISOString();
+
+  persistDb();
+
+  logServerAudit(
+    user?.id || 'usr_admin',
+    user?.name || 'مدیریت',
+    'بررسی گزارش کاری',
+    'گزارش‌های کاری پرسنل',
+    `ثبت بازخورد مدیر برای گزارش "${report.title}"`,
+    req.ip
+  );
+
+  res.json({ success: true, report });
+});
+
+app.delete('/api/work-reports/:id', requireAuth, (req: Request, res: Response) => {
+  const { id } = req.params;
+  const user = (req as any).user;
+  if (!db.workReports) db.workReports = [];
+
+  const initialLen = db.workReports.length;
+  db.workReports = db.workReports.filter((r: any) => {
+    if (r.id !== id) return true;
+    // Only owner or admin can delete
+    if (user?.role !== 'ADMIN' && r.employeeId !== user?.employeeId) {
+      return true;
+    }
+    return false;
+  });
+
+  if (db.workReports.length === initialLen) {
+    return res.status(404).json({ success: false, message: 'گزارش کاری یافت نشد یا مجاز به حذف نیستید.' });
+  }
+
+  persistDb();
+  res.json({ success: true, message: 'گزارش کاری حذف شد.' });
+});
+
 // Full Backup Export strictly for Super Admin (Fixes BACKUP-002)
 app.get('/api/backup/export', requireRole('ADMIN'), (req: Request, res: Response) => {
   const user = (req as any).user;
@@ -2433,6 +2546,7 @@ app.get('/api/backup/export', requireRole('ADMIN'), (req: Request, res: Response
       salaries: db.salaries,
       bonusesPenalties: db.bonusesPenalties || [],
       calendarEvents: db.calendarEvents || [],
+      workReports: db.workReports || [],
       auditLogs: db.auditLogs,
       messages: db.messages
     }
@@ -2464,6 +2578,7 @@ app.post('/api/backup/import', requireRole('ADMIN'), (req: Request, res: Respons
     if (data.advances) db.advances = data.advances;
     if (data.salaries) db.salaries = data.salaries;
     if (data.bonusesPenalties) db.bonusesPenalties = data.bonusesPenalties;
+    if (data.workReports) db.workReports = data.workReports;
     if (data.messages) db.messages = data.messages;
 
     logServerAudit(user.id, user.name, 'بازیابی پشتیبان', 'پایگاه داده', `بازیابی کامل دیتابیس نسخه ${version || 'نامشخص'}`, req.ip);

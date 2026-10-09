@@ -21,7 +21,8 @@ import {
   HomeworkTaskStatus,
   FinancialReminder,
   FinancialReminderStatus,
-  CalendarEvent
+  CalendarEvent,
+  WorkReport
 } from '../types';
 import {
   initialCompanySettings,
@@ -60,6 +61,7 @@ const STORAGE_KEYS = {
   MESSAGES: 'mgommon_messages_v4',
   ALARMS: 'mgommon_alarms_v4',
   FINANCIAL_REMINDERS: 'mgommon_financial_reminders_v4',
+  WORK_REPORTS: 'mgommon_work_reports_v4',
   CURRENT_USER: 'mgommon_current_user_v4',
   AUTH_TOKEN: 'mgommon_auth_token_v4',
   REMEMBERED_USER: 'mgommon_remembered_user_v4',
@@ -1663,6 +1665,65 @@ export class StorageService {
     this.saveAttendance(updated);
   }
 
+  // دستور مدیر جهت محاسبه تمام‌وقت و کامل تردد پرسنل با وجود خروج زودهنگام
+  static setAttendanceCreditFullDay(
+    recordId: string,
+    creditFullDay: boolean,
+    reviewerName: string,
+    reason?: string
+  ): { success: boolean; message: string; record?: AttendanceRecord } {
+    const records = this.getAllAttendanceRaw();
+    const target = records.find(r => r.id === recordId);
+    if (!target) return { success: false, message: 'رکورد تردد یافت نشد.' };
+
+    const employees = this.getAllEmployeesRaw();
+    const emp = employees.find(e => e.id === target.employeeId);
+    const shifts = this.getShifts();
+    const shift = shifts.find(s => s.id === emp?.shiftId) || shifts[0];
+    const settings = this.getSettings();
+    const standardDailyHours = (shift && typeof shift.startTime === 'string' && typeof shift.endTime === 'string')
+      ? 8
+      : (settings.dailyWorkHours || 8);
+
+    const standardMins = standardDailyHours * 60;
+    const notesAppend = creditFullDay
+      ? `(محاسبه تمام‌وقت به دستور مدیر: ${reason || 'موافقت با خاتمه زودهنگام کار بدون کسر حقوق'} - تایید: ${reviewerName})`
+      : '(لغو محاسبه تمام‌وقت توسط مدیر)';
+
+    const updatedRecords = records.map(r => {
+      if (r.id === recordId) {
+        return {
+          ...r,
+          isManagerCreditFullDay: creditFullDay,
+          managerCreditReason: reason,
+          earlyExitMinutes: creditFullDay ? 0 : r.earlyExitMinutes,
+          workDurationMinutes: creditFullDay ? Math.max(r.workDurationMinutes, standardMins) : r.workDurationMinutes,
+          notes: `${(r.notes || '').replace(/\(محاسبه تمام‌وقت به دستور مدیر.*?\)/g, '').trim()} ${notesAppend}`.trim()
+        };
+      }
+      return r;
+    });
+
+    this.saveAttendance(updatedRecords);
+
+    // Recompute salary for the month if computed
+    const month = target.date.substring(0, 7);
+    this.calculateSalaryForEmployee(target.employeeId, month);
+
+    this.addAuditLog(
+      'محاسبه تمام‌وقت کارکرد',
+      'حضور و غیاب',
+      `${creditFullDay ? 'اعمال' : 'لغو'} محاسبه تمام‌وقت برای ${emp ? `${emp.firstName} ${emp.lastName}` : target.employeeId} در تاریخ ${target.date} توسط ${reviewerName}`
+    );
+
+    return {
+      success: true,
+      message: creditFullDay
+        ? 'دستور کارکرد تمام‌وقت با موفقیت اعمال شد و از کسر حقوق کارمند جلوگیری به عمل آمد.'
+        : 'دستور کارکرد تمام‌وقت لغو شد.'
+    };
+  }
+
   static updateTodayAttendanceManual(
     employeeId: string,
     checkInTime: string,
@@ -2530,6 +2591,149 @@ export class StorageService {
   }
 
   // ==========================================================
+  // WORK REPORTS (گزارش‌های کاری روزانه اختیاری پرسنل)
+  // ==========================================================
+
+  static getAllWorkReportsRaw(): WorkReport[] {
+    return getItem<WorkReport[]>(STORAGE_KEYS.WORK_REPORTS, []);
+  }
+
+  static saveWorkReports(reports: WorkReport[]): void {
+    setItem(STORAGE_KEYS.WORK_REPORTS, reports);
+  }
+
+  static getWorkReports(requestingUser?: User): WorkReport[] {
+    const all = this.getAllWorkReportsRaw();
+    const user = requestingUser || this.getCurrentUser();
+    if (!user) return [];
+
+    if (user.role === 'EMPLOYEE' && user.employeeId) {
+      return all.filter(r => r.employeeId === user.employeeId);
+    }
+    return all;
+  }
+
+  static submitWorkReport(data: {
+    employeeId: string;
+    title: string;
+    content: string;
+    date?: string;
+    hoursSpent?: number;
+    tags?: string[];
+  }): { success: boolean; message: string; report?: WorkReport } {
+    if (!data.employeeId || !data.title?.trim() || !data.content?.trim()) {
+      return { success: false, message: 'عنوان و شرح گزارش کاری الزامی است.' };
+    }
+
+    const employees = this.getAllEmployeesRaw();
+    const emp = employees.find(e => e.id === data.employeeId);
+    const employeeName = emp ? `${emp.firstName} ${emp.lastName}` : 'پرسنل';
+    const settings = this.getSettings();
+
+    const newReport: WorkReport = {
+      id: `wr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      companyId: settings.id,
+      employeeId: data.employeeId,
+      employeeName,
+      date: data.date || getTodayShamsi(),
+      title: data.title.trim(),
+      content: data.content.trim(),
+      hoursSpent: data.hoursSpent ? Number(data.hoursSpent) : undefined,
+      tags: data.tags || [],
+      status: 'SUBMITTED',
+      createdAt: `${getTodayShamsi()} - ${getCurrentTimeStr()}`
+    };
+
+    const current = this.getAllWorkReportsRaw();
+    current.unshift(newReport);
+    this.saveWorkReports(current);
+
+    this.addAuditLog(
+      'ثبت گزارش کاری',
+      'گزارش‌های کاری پرسنل',
+      `ثبت گزارش روزانه "${newReport.title}" توسط ${employeeName} برای تاریخ ${newReport.date}`
+    );
+
+    const token = this.getAuthToken();
+    if (token) {
+      fetch('/api/work-reports', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(newReport)
+      }).catch(err => console.warn('Server sync error for work report:', err));
+    }
+
+    return {
+      success: true,
+      message: 'گزارش کاری با موفقیت ثبت شد و در پرونده و سوابق شما ذخیره گردید.',
+      report: newReport
+    };
+  }
+
+  static reviewWorkReport(
+    id: string,
+    feedback: string,
+    reviewerName: string
+  ): { success: boolean; message: string } {
+    const reports = this.getAllWorkReportsRaw();
+    const target = reports.find(r => r.id === id);
+    if (!target) return { success: false, message: 'گزارش کاری یافت نشد.' };
+
+    const updated = reports.map(r => {
+      if (r.id === id) {
+        return {
+          ...r,
+          status: 'ACKNOWLEDGED' as const,
+          seenBy: reviewerName,
+          seenAt: `${getTodayShamsi()} - ${getCurrentTimeStr()}`,
+          adminFeedback: feedback ? feedback.trim() : undefined,
+          feedbackBy: reviewerName,
+          feedbackAt: `${getTodayShamsi()} - ${getCurrentTimeStr()}`
+        };
+      }
+      return r;
+    });
+
+    this.saveWorkReports(updated);
+
+    this.addAuditLog(
+      'بررسی گزارش کاری',
+      'گزارش‌های کاری پرسنل',
+      `مشاهده و ثبت بازخورد گزارش کاری "${target.title}" توسط ${reviewerName}`
+    );
+
+    const token = this.getAuthToken();
+    if (token) {
+      fetch(`/api/work-reports/${id}/feedback`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ feedback, reviewerName })
+      }).catch(err => console.warn('Server sync error for work report review:', err));
+    }
+
+    return { success: true, message: 'بازخورد مدیر ارشد با موفقیت ثبت شد.' };
+  }
+
+  static deleteWorkReport(id: string): { success: boolean; message: string } {
+    const raw = this.getAllWorkReportsRaw().filter(r => r.id !== id);
+    this.saveWorkReports(raw);
+    const token = this.getAuthToken();
+    if (token) {
+      fetch(`/api/work-reports/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).catch(err => console.warn('Server sync error for work report delete:', err));
+    }
+    return { success: true, message: 'گزارش کاری حذف شد.' };
+  }
+
+  // ==========================================================
   // HOMEWORK / PIECEWORK TASKS (کار در منزل / کارمزدی و قطعه‌کاری)
   // ==========================================================
 
@@ -3047,6 +3251,7 @@ export class StorageService {
         advances: this.getAllAdvanceRequestsRaw(),
         salaries: this.getAllSalariesRaw(),
         bonusesPenalties: getItem<BonusOrPenalty[]>(STORAGE_KEYS.BONUSES, initialBonusesPenalties),
+        workReports: this.getAllWorkReportsRaw(),
         messages: this.getAllMessagesRaw(),
         auditLogs: this.getAllAuditLogsRaw(),
       }
@@ -3076,6 +3281,7 @@ export class StorageService {
       if (Array.isArray(d.advances)) this.saveAdvanceRequests(d.advances);
       if (Array.isArray(d.salaries)) this.saveSalaries(d.salaries);
       if (Array.isArray(d.bonusesPenalties)) setItem(STORAGE_KEYS.BONUSES, d.bonusesPenalties);
+      if (Array.isArray(d.workReports)) this.saveWorkReports(d.workReports);
       if (Array.isArray(d.messages)) this.saveMessages(d.messages);
       if (Array.isArray(d.auditLogs)) setItem(STORAGE_KEYS.AUDIT_LOGS, d.auditLogs);
 
