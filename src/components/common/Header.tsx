@@ -421,59 +421,8 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                   </div>
 
-                  {/* Actions in Dropdown */}
+                  {/* Actions in Dropdown: ONLY Account Info, Profile/Password, and Logout */}
                   <div className="p-2 border-t border-slate-100 space-y-1.5">
-                    {(currentUser.role === 'ADMIN' ||
-                      currentUser.isSuperAdmin ||
-                      currentUser.isFinanceManager ||
-                      currentUser.isHrManager ||
-                      currentUser.managementRoles?.includes('FINANCE_OFFICER') ||
-                      currentUser.managementRoles?.includes('HR_ADMIN')) &&
-                      onOpenQuickMiscPayment && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDropdownOpen(false);
-                            onOpenQuickMiscPayment();
-                          }}
-                          className="w-full py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors border border-emerald-200"
-                        >
-                          <Banknote className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>ثبت سریع واریزی متفرقه به پرسنل</span>
-                        </button>
-                      )}
-
-                    {onNavigateToWorkReports && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDropdownOpen(false);
-                          onNavigateToWorkReports();
-                        }}
-                        className="w-full py-2 px-3 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors border border-teal-200"
-                      >
-                        <ClipboardList className="w-3.5 h-3.5 text-teal-600" />
-                        <span>مشاهده و ثبت گزارش‌های کار روزانه</span>
-                      </button>
-                    )}
-
-                    {currentUser.employeeId && onQuickClockIn && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDropdownOpen(false);
-                          onQuickClockIn();
-                        }}
-                        className="w-full py-2 px-3 rounded-xl bg-indigo-50/80 hover:bg-indigo-100 text-indigo-800 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors border border-indigo-200"
-                      >
-                        <Clock className="w-3.5 h-3.5 text-indigo-600" />
-                        <span>ثبت سریع تردد ورود/خروج من</span>
-                      </button>
-                    )}
-
                     <button
                       type="button"
                       onClick={(e) => {
@@ -481,26 +430,11 @@ export const Header: React.FC<HeaderProps> = ({
                         setDropdownOpen(false);
                         setIsProfileModalOpen(true);
                       }}
-                      className="w-full py-2 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors border border-indigo-200"
+                      className="w-full py-2.5 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors border border-indigo-200"
                     >
                       <UserCog className="w-3.5 h-3.5 text-indigo-600" />
                       <span>مشخصات و تغییر رمز عبور</span>
                     </button>
-
-                    {currentUser.role !== 'EMPLOYEE' && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDropdownOpen(false);
-                          setIsLoginModalOpen(true);
-                        }}
-                        className="w-full py-2 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors border border-slate-200"
-                      >
-                        <KeyRound className="w-3.5 h-3.5 text-slate-500" />
-                        <span>ورود با حساب کاربری دیگر</span>
-                      </button>
-                    )}
 
                     {onLogout && (
                       <button
@@ -510,7 +444,7 @@ export const Header: React.FC<HeaderProps> = ({
                           setDropdownOpen(false);
                           onLogout();
                         }}
-                        className="w-full py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors border border-rose-200"
+                        className="w-full py-2.5 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors border border-rose-200"
                       >
                         <LogOut className="w-3.5 h-3.5 text-rose-600" />
                         <span>خروج از حساب کاربری</span>

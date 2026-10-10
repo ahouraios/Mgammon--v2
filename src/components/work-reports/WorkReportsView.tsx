@@ -14,7 +14,8 @@ import {
   Sparkles,
   ChevronLeft,
   X,
-  FileText
+  FileText,
+  ShieldCheck
 } from 'lucide-react';
 import { Employee, User, WorkReport } from '../../types';
 import { StorageService } from '../../services/storage';
@@ -162,6 +163,31 @@ export const WorkReportsView: React.FC<WorkReportsViewProps> = ({
 
   return (
     <div className="space-y-6" dir="rtl">
+      {/* SENIOR ADMIN EXEMPTION NOTICE */}
+      {isSeniorAdmin && (
+        <div className="bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 text-white p-4 sm:p-5 rounded-3xl shadow-md border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-teal-500/20 text-teal-300 flex items-center justify-center font-bold text-base shrink-0 border border-teal-500/30">
+              <ShieldCheck className="w-6 h-6 text-teal-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-sm text-white">مدیریت ارشد کارگاه (مجید نورایی)</h3>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-400/20 text-teal-300 border border-teal-400/30">
+                  معاف از ثبت گزارش کار روزانه
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                مدیر ارشد کارگاه از ارائه و ثبت گزارش کار روزانه معاف بوده و وظیفه نظارت عالیه، رویت گزارش‌ها و تایید عملکرد پرسنل و سایر مدیران را بر عهده دارد.
+              </p>
+            </div>
+          </div>
+          <div className="text-[11px] text-teal-200 bg-white/10 px-3.5 py-2 rounded-xl border border-white/10 shrink-0 font-medium text-center">
+            نظارت و ثبت نظر بر عملکرد پرسنل در لیست زیر
+          </div>
+        </div>
+      )}
+
       {/* Top Banner / Header */}
       <div className="bg-gradient-to-r from-teal-700 via-teal-800 to-indigo-900 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
         <div className="absolute -left-10 -bottom-10 w-48 h-48 bg-white/5 rounded-full blur-2xl" />
@@ -178,7 +204,7 @@ export const WorkReportsView: React.FC<WorkReportsViewProps> = ({
                 </span>
               </h2>
               <p className="text-xs text-teal-100/90 mt-1">
-                ثبت شرح فعالیت‌های روزانه، ثبت نظر و بازخورد مدیر و نظارت مدیر منابع انسانی و مدیریت ارشد
+                ثبت شرح فعالیت‌های روزانه کلیه پرسنل و مدیران (به جز مدیر ارشد)، ثبت بازخورد و تایید توسط مدیریت
               </p>
             </div>
           </div>
@@ -498,11 +524,6 @@ export const WorkReportsView: React.FC<WorkReportsViewProps> = ({
                     className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500 cursor-pointer"
                     required
                   >
-                    {isSeniorAdmin && (
-                      <option value="usr_admin">
-                        {currentUser.name} [مدیر ارشد کارگاه]
-                      </option>
-                    )}
                     {employees.map((emp) => (
                       <option key={emp.id} value={emp.id}>
                         {emp.firstName} {emp.lastName} ({emp.position || 'پرسنل'}{emp.isHrManager ? ' - مدیر منابع انسانی' : emp.isFinanceManager ? ' - مدیر مالی' : ''})

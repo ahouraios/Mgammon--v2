@@ -2009,8 +2009,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   onClick={() => onNavigate('work-reports')}
                   className="px-3.5 py-1.5 rounded-xl bg-teal-600 text-white text-xs font-bold hover:bg-teal-700 transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>ثبت اولین گزارش کار</span>
+                  <ClipboardList className="w-3.5 h-3.5" />
+                  <span>
+                    {currentUser?.role === 'ADMIN' ? 'مشاهده و مدیریت سامانه گزارش‌های کار' : 'ثبت اولین گزارش کار'}
+                  </span>
                 </button>
               </div>
             ) : (
