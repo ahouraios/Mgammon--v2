@@ -63,7 +63,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
 
     const cleanId = loginId.trim();
     if (!cleanId) {
-      setErrorMsg('لطفاً کد پرسنلی یا شماره موبایل را وارد نمایید.');
+      setErrorMsg('لطفاً نام کاربری، کد پرسنلی یا شماره موبایل را وارد نمایید.');
       return;
     }
     if (!password) {
@@ -80,10 +80,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
           onLogin(res.user!);
         }, 400);
       } else {
-        setErrorMsg(res.message || 'کد پرسنلی یا رمز عبور اشتباه است.');
+        setErrorMsg(res.message || 'مشخصات وارد شده یا رمز عبور اشتباه است.');
       }
     } catch {
-      setErrorMsg('خطا در برقراری ارتباط با سرور.');
+      setErrorMsg('خطا در برقراری ارتباط با سامانه.');
     } finally {
       setIsSubmitting(false);
     }
@@ -360,14 +360,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
                 {/* 4. Username / Personal Code / Phone */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    کد پرسنلی یا شماره موبایل
+                    نام کاربری، کد پرسنلی یا شماره موبایل
                   </label>
                   <input
                     type="text"
                     required
                     value={loginId}
                     onChange={(e) => setLoginId(e.target.value)}
-                    placeholder="کد پرسنلی یا شماره موبایل"
+                    placeholder="مثال: نام کاربری، کد پرسنلی یا شماره موبایل"
                     className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 font-mono transition-all bg-white"
                   />
                 </div>
