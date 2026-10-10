@@ -17,13 +17,15 @@ import {
   Navigation,
   Trash2,
   BookOpen,
-  MessageSquare
+  MessageSquare,
+  ShieldCheck
 } from 'lucide-react';
 import { AttendanceRecord, Employee, Shift, User as AppUser, WorkMission, WorkReport } from '../../types';
 import {
   getTodayShamsi,
   minutesToHoursAndMinutes,
   getCurrentTimeStr,
+  formatCurrencyTomans,
 } from '../../utils/dateUtils';
 import { StorageService } from '../../services/storage';
 import { ShamsiDatePicker } from '../common/ShamsiDatePicker';

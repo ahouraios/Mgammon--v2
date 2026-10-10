@@ -21,7 +21,8 @@ import {
   Save,
   LogOut,
   Banknote,
-  Coins
+  Coins,
+  ClipboardList
 } from 'lucide-react';
 import { User, Role, CompanySettings } from '../../types';
 import { getTodayShamsiDetailed } from '../../utils/dateUtils';

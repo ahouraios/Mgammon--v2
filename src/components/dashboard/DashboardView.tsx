@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   Sparkles,
   Receipt,
+  Plus,
   PlusCircle,
   CreditCard,
   FileSpreadsheet,

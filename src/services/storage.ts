@@ -2683,6 +2683,7 @@ export class StorageService {
 
   static submitWorkReport(data: {
     employeeId: string;
+    employeeName?: string;
     title: string;
     content: string;
     date?: string;
@@ -2695,7 +2696,7 @@ export class StorageService {
 
     const employees = this.getAllEmployeesRaw();
     const emp = employees.find(e => e.id === data.employeeId);
-    const employeeName = emp ? `${emp.firstName} ${emp.lastName}` : 'پرسنل';
+    const employeeName = data.employeeName || (emp ? `${emp.firstName} ${emp.lastName}` : 'پرسنل');
     const settings = this.getSettings();
 
     const newReport: WorkReport = {
