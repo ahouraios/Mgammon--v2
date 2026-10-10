@@ -39,7 +39,8 @@ import {
   PackageCheck,
   CheckCircle2,
   Edit2,
-  BookOpen
+  BookOpen,
+  AlertCircle
 } from 'lucide-react';
 import {
   Employee,
