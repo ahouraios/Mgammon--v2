@@ -154,6 +154,10 @@ export interface Employee {
   allowManualAttendance?: boolean; // مجاز به ثبت تردد مستقیم دستی (بدون نیاز به اسکن بارکد/QR)
   isHrManager?: boolean; // مدیر منابع انسانی (تخصیص خودکار دسترسی‌های پرسنلی و شیفت)
   isFinanceManager?: boolean; // مدیر منابع مالی (تخصیص خودکار دسترسی‌های مالی، حقوق و صورتحساب/چک)
+  // حق مسئولیت مدیران و پرسنل (۳ حالت: غیرفعال، درصدی از حقوق، مبلغ ثابت ماهانه)
+  hasResponsibilityAllowance?: boolean;
+  responsibilityAllowanceType?: 'PERCENTAGE' | 'FIXED_AMOUNT';
+  responsibilityAllowanceValue?: number;
   // مزایا و کسورات اختصاصی پرسنل (در صورت صفر بودن، نه در محاسبات لحاظ شده و نه در فیش نمایش داده می‌شود)
   housingAllowance?: number; // حق مسکن اختصاصی (۰ = بدون حق مسکن و حذف از فیش)
   groceryAllowance?: number; // بن خواروبار اختصاصی (۰ = بدون بن خواروبار و حذف از فیش)
@@ -330,6 +334,7 @@ export interface MiscPayment {
   amount: number; // in Tomans
   title: string; // شرح یا نوع پرداخت (مثال: پرداخت متفرقه، علی‌الحساب، سایر)
   date: string; // تاریخ شمسی
+  time?: string; // ساعت ثبت واریز (مثال: 14:35)
   month: string; // دوره حقوقی مرتبط، مثال: 1405/07
   deductFromSalary: boolean; // آیا از حقوق کسر شود؟ (بله / خیر)
   notes?: string;
@@ -409,6 +414,8 @@ export interface SalaryRecord {
   personalCardExpensesTotal?: number; // هزینه پرداخت‌شده از کارت شخصی کارگر (اضافه‌شده به حقوق)
   homeworkWagesTotal?: number; // دستمزد کار در منزل و کارمزدی (اضافه‌شده به حقوق دوره جاری - بدون تغییر پایه حقوق)
   miscDeductionsTotal?: number; // کسورات پرداخت‌های متفرقه که گزینه کسر از حقوق فعال بوده
+  responsibilityAllowance?: number; // حق مسئولیت ماهانه مدیر یا پرسنل
+  miscPaymentsTotal?: number; // کل واریزی‌های متفرقه ثبت‌شده برای پرسنل در این ماه
   insuranceDeduction: number;
   taxDeduction: number;
   housingAllowance: number;

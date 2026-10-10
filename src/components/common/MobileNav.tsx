@@ -20,7 +20,8 @@ import {
   Camera,
   LogOut,
   Bell,
-  Receipt
+  Receipt,
+  ClipboardList
 } from 'lucide-react';
 import { Role, User } from '../../types';
 import { NavTab } from './Sidebar';
@@ -39,6 +40,7 @@ interface MobileNavProps {
   pendingLeavesCount: number;
   pendingAdvancesCount: number;
   pendingFinancialCount?: number;
+  pendingReportsCount?: number;
 }
 
 export const MobileNav: React.FC<MobileNavProps> = ({
@@ -53,6 +55,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
   pendingLeavesCount,
   pendingAdvancesCount,
   pendingFinancialCount = 0,
+  pendingReportsCount = 0,
 }) => {
   const activeRole = currentRole || role || currentUser?.role || 'ADMIN';
   const totalPending = pendingLeavesCount + pendingAdvancesCount;
@@ -63,6 +66,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       return [
         { id: 'employee-portal' as NavTab, label: 'پرتال من', icon: UserCheck },
         { id: 'attendance' as NavTab, label: 'تردد و اسکن', icon: Camera },
+        { id: 'work-reports' as NavTab, label: 'گزارش کار', icon: ClipboardList },
         { id: 'leaves' as NavTab, label: 'مرخصی', icon: PlaneTakeoff, badge: totalPending },
         { id: 'payroll' as NavTab, label: 'حقوق', icon: CreditCard },
       ];
@@ -70,9 +74,9 @@ export const MobileNav: React.FC<MobileNavProps> = ({
     if (activeRole === 'MANAGER') {
       return [
         { id: 'dashboard' as NavTab, label: 'داشبورد', icon: LayoutDashboard },
-        { id: 'employees' as NavTab, label: 'پرسنل', icon: Users },
+        { id: 'employee-portal' as NavTab, label: 'میز کار من', icon: UserCheck },
         { id: 'attendance' as NavTab, label: 'ترددها', icon: Clock },
-        { id: 'qr-kiosk' as NavTab, label: 'پوستر بارکد', icon: Printer },
+        { id: 'work-reports' as NavTab, label: 'گزارش کار', icon: ClipboardList, badge: pendingReportsCount },
         { id: 'financial-reminders' as NavTab, label: 'چک و اقساط', icon: Receipt, badge: pendingFinancialCount },
       ];
     }
@@ -81,8 +85,8 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       { id: 'dashboard' as NavTab, label: 'داشبورد', icon: LayoutDashboard },
       { id: 'employees' as NavTab, label: 'پرسنل', icon: Users },
       { id: 'attendance' as NavTab, label: 'ترددها', icon: Clock },
+      { id: 'work-reports' as NavTab, label: 'گزارش کار', icon: ClipboardList, badge: pendingReportsCount },
       { id: 'financial-reminders' as NavTab, label: 'چک و اقساط', icon: Receipt, badge: pendingFinancialCount },
-      { id: 'messages' as NavTab, label: 'پیام‌ها', icon: MessageSquare },
     ];
   };
 
@@ -99,6 +103,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       const list: NavDrawerItem[] = [
         { id: 'employee-portal' as NavTab, label: 'میز کار پرسنلی', icon: UserCheck },
         { id: 'attendance' as NavTab, label: 'ثبت تردد با دوربین و GPS', icon: Camera },
+        { id: 'work-reports' as NavTab, label: 'گزارش‌های کار من', icon: ClipboardList },
         { id: 'qr-kiosk' as NavTab, label: 'پوستر بارکدهای کارگاه', icon: Printer },
         { id: 'leaves' as NavTab, label: 'درخواست‌های مرخصی', icon: PlaneTakeoff },
         { id: 'advances' as NavTab, label: 'درخواست مساعده', icon: Wallet },
@@ -112,9 +117,11 @@ export const MobileNav: React.FC<MobileNavProps> = ({
     if (activeRole === 'MANAGER') {
       return [
         { id: 'dashboard' as NavTab, label: 'داشبورد مدیریت', icon: LayoutDashboard },
+        { id: 'employee-portal' as NavTab, label: 'میز کار پرسنلی من', icon: UserCheck },
         { id: 'alarms' as NavTab, label: 'زنگ و آلارم کارگاه', icon: Bell },
         { id: 'employees' as NavTab, label: 'لیست پرسنل', icon: Users },
         { id: 'attendance' as NavTab, label: 'گزارش تردد پرسنل', icon: Clock },
+        { id: 'work-reports' as NavTab, label: 'گزارش‌های کار روزانه', icon: ClipboardList, badge: pendingReportsCount },
         { id: 'qr-kiosk' as NavTab, label: 'چاپ پوستر بارکد کارگاه', icon: Printer },
         { id: 'messages' as NavTab, label: 'اطلاع‌رسانی و پیامک', icon: MessageSquare },
         { id: 'leaves' as NavTab, label: 'بررسی مرخصی‌ها', icon: PlaneTakeoff, badge: pendingLeavesCount },
@@ -131,6 +138,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       { id: 'alarms' as NavTab, label: 'زنگ و آلارم کارگاه', icon: Bell },
       { id: 'employees' as NavTab, label: 'مدیریت پرسنل', icon: Users },
       { id: 'attendance' as NavTab, label: 'مدیریت ترددها', icon: Clock },
+      { id: 'work-reports' as NavTab, label: 'گزارش‌های کار روزانه', icon: ClipboardList, badge: pendingReportsCount },
       { id: 'qr-kiosk' as NavTab, label: 'کیوسک دینامیک QR و GPS', icon: QrCode },
       { id: 'schedules' as NavTab, label: 'شیفت‌ها و ساعات کاری', icon: CalendarDays },
       { id: 'messages' as NavTab, label: 'سامانه پیامک و اطلاع‌رسانی', icon: MessageSquare },

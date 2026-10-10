@@ -18,6 +18,7 @@ import {
   DollarSign,
   PlusCircle,
   FileText,
+  Banknote,
 } from 'lucide-react';
 import { SalaryRecord, Employee, User as AppUser, ManagerAdjustmentType, BonusOrPenalty } from '../../types';
 import { StorageService } from '../../services/storage';
@@ -260,6 +261,15 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
         (b) =>
           b.employeeId === viewingPayslip.employeeId &&
           b.month?.replace(/-/g, '/') === viewingPayslip.month?.replace(/-/g, '/')
+      )
+    : [];
+
+  const payslipMiscPayments = viewingPayslip
+    ? StorageService.getAllMiscPaymentsRaw().filter(
+        (p) =>
+          p.employeeId === viewingPayslip.employeeId &&
+          (p.month?.replace(/-/g, '/') === viewingPayslip.month?.replace(/-/g, '/') ||
+           p.date?.replace(/-/g, '/').startsWith(viewingPayslip.month?.replace(/-/g, '/')))
       )
     : [];
 
@@ -657,7 +667,7 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
               ) : (
                 filteredSalaries.map((sal) => {
                   const emp = employees.find((e) => e.id === sal.employeeId);
-                  const allowances = (sal.housingAllowance || 0) + (sal.groceryAllowance || 0) + (sal.childAllowance || 0) + (sal.bonusesTotal || 0) + (sal.homeworkWagesTotal || 0);
+                  const allowances = (sal.housingAllowance || 0) + (sal.groceryAllowance || 0) + (sal.childAllowance || 0) + (sal.bonusesTotal || 0) + (sal.homeworkWagesTotal || 0) + (sal.responsibilityAllowance || 0);
                   const statutoryDeductions = (sal.insuranceDeduction || 0) + (sal.taxDeduction || 0) + (sal.penaltiesTotal || 0) + (sal.miscDeductionsTotal || 0);
                   return (
                     <tr key={sal.id} className="hover:bg-slate-50/70 transition-colors">
@@ -865,6 +875,14 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
                         </span>
                       </div>
                     )}
+                    {viewingPayslip.responsibilityAllowance && viewingPayslip.responsibilityAllowance > 0 ? (
+                      <div className="flex justify-between py-1 border-b border-slate-100 text-indigo-700 font-semibold bg-indigo-50/60 px-2 rounded-lg">
+                        <span>حق مسئولیت:</span>
+                        <span className="font-mono">
+                          +{formatCurrencyTomans(viewingPayslip.responsibilityAllowance)}
+                        </span>
+                      </div>
+                    ) : null}
                     {viewingPayslip.bonusesTotal > 0 && (
                       <div className="flex justify-between py-1 border-b border-slate-100 text-emerald-600 font-semibold">
                         <span>پاداش عملکرد و تشویقی:</span>
@@ -1027,6 +1045,41 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
                           adj.type === 'BONUS' ? 'text-emerald-600' : 'text-rose-600'
                         }`}>
                           {adj.type === 'BONUS' ? '+' : '-'}{formatCurrencyTomans(adj.amount)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Itemized Miscellaneous Payments (واریزی‌های متفرقه ثبت‌شده) */}
+              {payslipMiscPayments.length > 0 && (
+                <div className="border border-emerald-200 rounded-xl overflow-hidden bg-emerald-50/50 p-3.5 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-emerald-950">
+                    <span className="flex items-center gap-1.5">
+                      <Banknote className="w-4 h-4 text-emerald-600" />
+                      <span>ریز واریزی‌های متفرقه ثبت‌شده برای این پرسنل (خارج از مساعده و تنخواه):</span>
+                    </span>
+                    <span className="text-[10px] text-emerald-700 font-normal">ثبت در حساب مالی پرسنل</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {payslipMiscPayments.map((pm) => (
+                      <div key={pm.id} className="flex items-center justify-between text-xs py-2 px-3 rounded-lg bg-white border border-emerald-200/80">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                            واریزی متفرقه
+                          </span>
+                          <span className="font-semibold text-slate-800">{pm.title}</span>
+                          <span className="text-[11px] text-slate-400 font-mono">({pm.date} - ساعت {pm.time || '۱۲:۰۰'})</span>
+                          {pm.notes && <span className="text-[11px] text-slate-500">• {pm.notes}</span>}
+                          {pm.deductFromSalary && (
+                            <span className="text-[10px] text-rose-600 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200 font-medium">
+                              کسر از حقوق ماه جاری
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-mono font-black text-emerald-700">
+                          +{formatCurrencyTomans(pm.amount)}
                         </span>
                       </div>
                     ))}

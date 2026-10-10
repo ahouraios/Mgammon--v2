@@ -1848,7 +1848,7 @@ app.get('/api/misc-payments', (req: Request, res: Response) => {
 
 app.post('/api/misc-payments', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
   const user = (req as any).user;
-  const { employeeId, amount, title, date, month, deductFromSalary, notes } = req.body;
+  const { employeeId, amount, title, date, time, month, deductFromSalary, notes } = req.body;
 
   if (!employeeId || !amount || Number(amount) <= 0 || !title) {
     return res.status(400).json({ success: false, message: 'اطلاعات پرداخت متفرقه ناقص است.' });
@@ -1868,6 +1868,7 @@ app.post('/api/misc-payments', requireRole('ADMIN', 'MANAGER'), (req: Request, r
     amount: Math.round(Number(amount)),
     title: String(title).trim(),
     date: date || tehran.dateStr,
+    time: time || tehran.timeStr.substring(0, 5),
     month: month || tehran.dateStr.substring(0, 7),
     deductFromSalary: !!deductFromSalary,
     notes: notes ? String(notes).trim() : undefined,

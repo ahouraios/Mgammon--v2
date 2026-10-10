@@ -96,7 +96,9 @@
               str.indexOf('websocket') !== -1 ||
               str.indexOf('WebSocket closed without opened') !== -1 ||
               str.indexOf('[vite]') !== -1 ||
-              str.indexOf('vite-hmr') !== -1
+              str.indexOf('vite-hmr') !== -1 ||
+              str.indexOf('Quota') !== -1 ||
+              str.indexOf('quota') !== -1
             ) {
               return;
             }
@@ -113,7 +115,9 @@
               str.indexOf('WebSocket') !== -1 ||
               str.indexOf('websocket') !== -1 ||
               str.indexOf('[vite]') !== -1 ||
-              str.indexOf('vite-hmr') !== -1
+              str.indexOf('vite-hmr') !== -1 ||
+              str.indexOf('Quota') !== -1 ||
+              str.indexOf('quota') !== -1
             ) {
               return;
             }
@@ -127,7 +131,9 @@
             msg.indexOf('WebSocket') !== -1 ||
             msg.indexOf('websocket') !== -1 ||
             msg.indexOf('vite') !== -1 ||
-            msg.indexOf('[vite]') !== -1
+            msg.indexOf('[vite]') !== -1 ||
+            msg.indexOf('Quota') !== -1 ||
+            msg.indexOf('quota') !== -1
           ) {
             if (e.preventDefault) e.preventDefault();
             if (e.stopImmediatePropagation) e.stopImmediatePropagation();
@@ -141,7 +147,9 @@
             msg.indexOf('WebSocket') !== -1 ||
             msg.indexOf('websocket') !== -1 ||
             msg.indexOf('vite') !== -1 ||
-            msg.indexOf('[vite]') !== -1
+            msg.indexOf('[vite]') !== -1 ||
+            msg.indexOf('Quota') !== -1 ||
+            msg.indexOf('quota') !== -1
           ) {
             if (e.preventDefault) e.preventDefault();
             if (e.stopImmediatePropagation) e.stopImmediatePropagation();

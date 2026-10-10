@@ -386,8 +386,24 @@ export function calculatePayroll(input: PayrollCalculationInput): PayrollCalcula
     ? Math.max(0, emp.childAllowance)
     : (typeof settings.childAllowance === 'number' && settings.childAllowance > 0 ? settings.childAllowance : 0);
 
+  // 7.1 RESPONSIBILITY ALLOWANCE (حق مسئولیت: درصد از حقوق یا مبلغ ثابت)
+  let responsibilityAllowance = 0;
+  if (emp.hasResponsibilityAllowance) {
+    if (emp.responsibilityAllowanceType === 'PERCENTAGE') {
+      const pct = Number(emp.responsibilityAllowanceValue) || 0;
+      responsibilityAllowance = Math.round(emp.baseSalary * (pct / 100));
+    } else {
+      responsibilityAllowance = Math.round(Number(emp.responsibilityAllowanceValue) || 0);
+    }
+  }
+
+  // 7.2 TOTAL MISCELLANEOUS PAYMENTS THIS MONTH (مجموع واریزی‌های متفرقه ثبت‌شده)
+  const miscPaymentsTotal = miscPayments
+    .filter(m => m.employeeId === emp.id && (m.month?.replace(/-/g, '/') === normMonth || m.date?.replace(/-/g, '/').startsWith(normMonth)))
+    .reduce((sum, m) => sum + (Number(m.amount) || 0), 0);
+
   // 8. GROSS SALARY (ناخالص حقوق)
-  const grossSalary = emp.baseSalary + overtimeAmount + bonuses + housing + grocery + child + approvedHomeworkWagesToSalary;
+  const grossSalary = emp.baseSalary + overtimeAmount + bonuses + housing + grocery + child + approvedHomeworkWagesToSalary + responsibilityAllowance;
 
   // 9. STATUTORY DEDUCTIONS: INSURANCE & TAX (بیمه و مالیات قانونی)
   let insuranceDeduction = 0;
@@ -397,7 +413,7 @@ export function calculatePayroll(input: PayrollCalculationInput): PayrollCalcula
       ? emp.insuranceRatePercent
       : (typeof settings.insuranceRatePercent === 'number' ? settings.insuranceRatePercent : 7);
     if (insuranceRate > 0) {
-      const insuranceBase = emp.baseSalary + housing + grocery;
+      const insuranceBase = emp.baseSalary + housing + grocery + responsibilityAllowance;
       insuranceDeduction = Math.round(insuranceBase * (insuranceRate / 100));
     }
   }
@@ -445,6 +461,8 @@ export function calculatePayroll(input: PayrollCalculationInput): PayrollCalcula
     personalCardExpensesTotal: approvedExpensesToSalary,
     homeworkWagesTotal: approvedHomeworkWagesToSalary,
     miscDeductionsTotal: miscDeductions,
+    responsibilityAllowance,
+    miscPaymentsTotal,
     housingAllowance: housing,
     groceryAllowance: grocery,
     childAllowance: child,

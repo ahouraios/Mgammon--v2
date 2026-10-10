@@ -38,7 +38,8 @@ import {
   Briefcase,
   Landmark,
   Receipt,
-  Coins
+  Coins,
+  Award
 } from 'lucide-react';
 import { Employee, Shift, User as AppUser, PERMISSION_LEVELS, MANAGEMENT_ROLES, ManagementRole } from '../../types';
 import {
@@ -191,6 +192,9 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     allowManualAttendance: false,
     isHrManager: false,
     isFinanceManager: false,
+    hasResponsibilityAllowance: false,
+    responsibilityAllowanceType: 'PERCENTAGE',
+    responsibilityAllowanceValue: 10,
     housingAllowance: undefined,
     groceryAllowance: undefined,
     childAllowance: undefined,
@@ -201,13 +205,14 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
   };
 
   const [formData, setFormData] = useState<Omit<Employee, 'id' | 'companyId'>>(defaultFormData);
+  const [responsibilityInput, setResponsibilityInput] = useState<string>('10');
   const [housingInput, setHousingInput] = useState<string>('');
   const [groceryInput, setGroceryInput] = useState<string>('');
   const [childInput, setChildInput] = useState<string>('');
   const [insuranceRateInput, setInsuranceRateInput] = useState<string>('');
   const [taxRateInput, setTaxRateInput] = useState<string>('');
   const [showCompensationOverrides, setShowCompensationOverrides] = useState<boolean>(false);
-  const [featureFilter, setFeatureFilter] = useState<'ALL' | 'HOMEWORK' | 'MANUAL_ATTENDANCE' | 'HR_MANAGERS' | 'FINANCE_MANAGERS'>('ALL');
+  const [featureFilter, setFeatureFilter] = useState<'ALL' | 'HOMEWORK' | 'MANUAL_ATTENDANCE' | 'HR_MANAGERS' | 'FINANCE_MANAGERS' | 'RESPONSIBILITY'>('ALL');
 
   const departments = ['ALL', ...Array.from(new Set([...categories, ...employees.map((e) => e.department)]))];
 
@@ -235,9 +240,12 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
       (featureFilter === 'HOMEWORK' && emp.isHomeworkWorker) ||
       (featureFilter === 'MANUAL_ATTENDANCE' && emp.allowManualAttendance) ||
       (featureFilter === 'HR_MANAGERS' && emp.isHrManager) ||
-      (featureFilter === 'FINANCE_MANAGERS' && emp.isFinanceManager);
+      (featureFilter === 'FINANCE_MANAGERS' && emp.isFinanceManager) ||
+      (featureFilter === 'RESPONSIBILITY' && emp.hasResponsibilityAllowance);
     return matchesSearch && matchesDept && matchesStatus && matchesFeature;
   });
+
+  const responsibilityCount = employees.filter(e => e.hasResponsibilityAllowance && (!isManagerOnly || !e.isConfidential)).length;
 
   const handleOpenAddModal = () => {
     setEditingEmployee(null);
@@ -277,6 +285,9 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
       allowManualAttendance: false,
       isHrManager: false,
       isFinanceManager: false,
+      hasResponsibilityAllowance: false,
+      responsibilityAllowanceType: 'PERCENTAGE',
+      responsibilityAllowanceValue: 10,
       housingAllowance: undefined,
       groceryAllowance: undefined,
       childAllowance: undefined,
@@ -285,6 +296,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
       isTaxExempt: false,
       taxRatePercent: undefined,
     });
+    setResponsibilityInput('10');
     setIsFormModalOpen(true);
   };
 
@@ -300,6 +312,12 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     setChildInput(emp.childAllowance !== undefined ? emp.childAllowance.toLocaleString('en-US') : '');
     setInsuranceRateInput(emp.insuranceRatePercent !== undefined ? String(emp.insuranceRatePercent) : '');
     setTaxRateInput(emp.taxRatePercent !== undefined ? String(emp.taxRatePercent) : '');
+    const respVal = emp.responsibilityAllowanceValue ?? 10;
+    setResponsibilityInput(
+      emp.responsibilityAllowanceType === 'FIXED_AMOUNT'
+        ? respVal.toLocaleString('en-US')
+        : String(respVal)
+    );
     setShowCompensationOverrides(
       emp.housingAllowance !== undefined ||
       emp.groceryAllowance !== undefined ||
@@ -346,6 +364,9 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
       allowManualAttendance: Boolean(emp.allowManualAttendance),
       isHrManager: Boolean(emp.isHrManager),
       isFinanceManager: Boolean(emp.isFinanceManager),
+      hasResponsibilityAllowance: Boolean(emp.hasResponsibilityAllowance),
+      responsibilityAllowanceType: emp.responsibilityAllowanceType || 'PERCENTAGE',
+      responsibilityAllowanceValue: emp.responsibilityAllowanceValue ?? 10,
       housingAllowance: emp.housingAllowance,
       groceryAllowance: emp.groceryAllowance,
       childAllowance: emp.childAllowance,
@@ -808,6 +829,18 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
             <Landmark className="w-3 h-3 text-teal-600" />
             <span>مدیران منابع مالی ({financeManagersCount})</span>
           </button>
+          <button
+            type="button"
+            onClick={() => setFeatureFilter('RESPONSIBILITY')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+              featureFilter === 'RESPONSIBILITY'
+                ? 'bg-indigo-700 text-white shadow-xs'
+                : 'bg-indigo-50 text-indigo-800 hover:bg-indigo-100 border border-indigo-200'
+            }`}
+          >
+            <Award className="w-3 h-3 text-indigo-600" />
+            <span>دارای حق مسئولیت ({responsibilityCount})</span>
+          </button>
         </div>
       </div>
 
@@ -864,6 +897,12 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                           {emp.isFinanceManager && (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-900 border border-teal-200 flex items-center gap-0.5">
                               <Landmark className="w-2.5 h-2.5 text-teal-600" /> مدیر منابع مالی
+                            </span>
+                          )}
+                          {emp.hasResponsibilityAllowance && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-900 border border-indigo-200 flex items-center gap-0.5">
+                              <Award className="w-2.5 h-2.5 text-indigo-600" />
+                              <span>حق مسئولیت {emp.responsibilityAllowanceType === 'PERCENTAGE' ? `(${emp.responsibilityAllowanceValue}٪)` : `(${formatCurrencyTomans(emp.responsibilityAllowanceValue || 0)})`}</span>
                             </span>
                           )}
                         </div>
@@ -1124,6 +1163,12 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                               {emp.isFinanceManager && (
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-900 border border-teal-200 flex items-center gap-0.5">
                                   <Landmark className="w-2.5 h-2.5 text-teal-600" /> مدیر منابع مالی
+                                </span>
+                              )}
+                              {emp.hasResponsibilityAllowance && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-900 border border-indigo-200 flex items-center gap-0.5" title="حق مسئولیت ماهانه">
+                                  <Award className="w-2.5 h-2.5 text-indigo-600" />
+                                  <span>حق مسئولیت {emp.responsibilityAllowanceType === 'PERCENTAGE' ? `(${emp.responsibilityAllowanceValue}٪)` : `(${formatCurrencyTomans(emp.responsibilityAllowanceValue || 0)})`}</span>
                                 </span>
                               )}
                             </div>
@@ -2390,6 +2435,142 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                     required
                   />
                 </div>
+              </div>
+
+              {/* RESPONSIBILITY ALLOWANCE (حق مسئولیت پرسنل و مدیران) */}
+              <div className="p-4 bg-gradient-to-br from-indigo-50/90 to-blue-50/70 border border-indigo-200/90 rounded-2xl space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2.5">
+                    <input
+                      type="checkbox"
+                      id="hasResponsibilityAllowanceCheck"
+                      checked={Boolean(formData.hasResponsibilityAllowance)}
+                      onChange={(e) => setFormData({ ...formData, hasResponsibilityAllowance: e.target.checked })}
+                      className="mt-1 w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    />
+                    <label htmlFor="hasResponsibilityAllowanceCheck" className="text-xs text-indigo-950 font-bold cursor-pointer">
+                      <span className="flex items-center gap-1.5">
+                        <Award className="w-4 h-4 text-indigo-600" />
+                        <span>تعیین حق مسئولیت (برای مدیران و پرسنل دارای مسئولیت)</span>
+                      </span>
+                      <span className="block text-[11px] font-normal text-indigo-800/90 mt-0.5 leading-relaxed">
+                        برای مدیران سطوح مختلف (منابع انسانی، مالی، فنی، سرپرست کارگاه) یا پرسنل ارشد، مدیر می‌تواند مبلغی یا درصدی از حقوق را به‌عنوان حق مسئولیت در نظر بگیرد.
+                      </span>
+                    </label>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 border ${
+                    formData.hasResponsibilityAllowance ? 'bg-indigo-100 text-indigo-800 border-indigo-300' : 'bg-slate-100 text-slate-500 border-slate-200'
+                  }`}>
+                    {formData.hasResponsibilityAllowance ? 'فعال' : 'غیرفعال'}
+                  </span>
+                </div>
+
+                {formData.hasResponsibilityAllowance && (
+                  <div className="pt-3 border-t border-indigo-200/70 space-y-3 animate-in fade-in">
+                    <div className="flex flex-wrap items-center gap-4">
+                      <label className="text-xs font-semibold text-slate-700">نحوه محاسبه حق مسئولیت:</label>
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="respType"
+                            value="PERCENTAGE"
+                            checked={formData.responsibilityAllowanceType === 'PERCENTAGE'}
+                            onChange={() => {
+                              setFormData((prev) => ({ ...prev, responsibilityAllowanceType: 'PERCENTAGE', responsibilityAllowanceValue: 10 }));
+                              setResponsibilityInput('10');
+                            }}
+                            className="text-indigo-600 cursor-pointer"
+                          />
+                          <span>درصد از حقوق پایه</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="respType"
+                            value="FIXED_AMOUNT"
+                            checked={formData.responsibilityAllowanceType === 'FIXED_AMOUNT'}
+                            onChange={() => {
+                              setFormData((prev) => ({ ...prev, responsibilityAllowanceType: 'FIXED_AMOUNT', responsibilityAllowanceValue: 2000000 }));
+                              setResponsibilityInput((2000000).toLocaleString('en-US'));
+                            }}
+                            className="text-indigo-600 cursor-pointer"
+                          />
+                          <span>مبلغ ثابت ماهانه (تومان)</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {formData.responsibilityAllowanceType === 'PERCENTAGE' ? (
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">
+                          درصد حق مسئولیت (از حقوق پایه)
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="1"
+                            max="100"
+                            value={formData.responsibilityAllowanceValue || ''}
+                            onChange={(e) => {
+                              const val = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+                              setFormData((prev) => ({ ...prev, responsibilityAllowanceValue: val }));
+                            }}
+                            placeholder="مثال: ۱۰ یا ۱۵"
+                            className="w-full text-xs p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono text-left tracking-wider"
+                            dir="ltr"
+                          />
+                          <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-medium">درصد (%)</span>
+                        </div>
+                        {formData.baseSalary > 0 && Number(formData.responsibilityAllowanceValue) > 0 && (
+                          <div className="mt-1.5 text-xs font-bold text-indigo-700 bg-indigo-50/90 px-3 py-1.5 rounded-lg border border-indigo-200/90 flex flex-col gap-0.5 animate-in fade-in">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] text-indigo-800/80 font-normal">مبلغ ماهانه معادل:</span>
+                              <span className="font-mono">{formatCurrencyTomans(Math.round(formData.baseSalary * (Number(formData.responsibilityAllowanceValue) / 100)))}</span>
+                            </div>
+                            <div className="text-[11px] text-indigo-900 font-medium">
+                              مبلغ به حروف: {numberToPersianWords(Math.round(formData.baseSalary * (Number(formData.responsibilityAllowanceValue) / 100)))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">
+                          مبلغ ثابت حق مسئولیت ماهانه (تومان)
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={responsibilityInput}
+                            onChange={(e) => {
+                              const raw = toEnglishDigits(e.target.value).replace(/\D/g, '');
+                              if (!raw) {
+                                setResponsibilityInput('');
+                                setFormData((prev) => ({ ...prev, responsibilityAllowanceValue: 0 }));
+                              } else {
+                                const num = parseInt(raw, 10);
+                                setResponsibilityInput(num.toLocaleString('en-US'));
+                                setFormData((prev) => ({ ...prev, responsibilityAllowanceValue: num }));
+                              }
+                            }}
+                            placeholder="مثال: ۲,۵۰۰,۰۰۰"
+                            className="w-full text-xs p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono text-left tracking-wider"
+                            dir="ltr"
+                          />
+                          <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-medium">تومان</span>
+                        </div>
+                        {Number(formData.responsibilityAllowanceValue) > 0 && (
+                          <div className="mt-1.5 text-xs font-bold text-indigo-700 bg-indigo-50/90 px-3 py-1.5 rounded-lg border border-indigo-200/90 flex items-center gap-1.5 animate-in fade-in">
+                            <span className="text-[11px] text-indigo-800/80 font-normal">مبلغ به حروف:</span>
+                            <span>{numberToPersianWords(Number(formData.responsibilityAllowanceValue))}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* بخش اختصاصی: تنظیمات مزایا، بیمه و مالیات (در صورت صفر بودن، از محاسبات و فیش حذف می‌شود) */}

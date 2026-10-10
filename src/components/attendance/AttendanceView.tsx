@@ -46,10 +46,13 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   canManage,
   currentUser,
 }) => {
+  const isSeniorAdmin = Boolean(currentUser?.isSuperAdmin || (currentUser?.role === 'ADMIN' && !currentUser?.employeeId));
   const isEmployeeRole = currentUser?.role === 'EMPLOYEE';
-  const currentEmp = isEmployeeRole
-    ? (employees.find((e) => e.id === currentUser?.employeeId) || employees.find((e) => e.email === currentUser?.email))
-    : (employees.find((e) => e.id === currentUser?.employeeId) || employees.find((e) => e.email === currentUser?.email) || employees[0]);
+  const currentEmp = isSeniorAdmin
+    ? undefined
+    : (currentUser?.employeeId
+        ? (employees.find((e) => e.id === currentUser.employeeId) || employees.find((e) => e.email === currentUser?.email))
+        : (employees.find((e) => e.email && e.email === currentUser?.email) || employees.find((e) => e.phone && e.phone === currentUser?.phone)));
 
   const todayStr = getTodayShamsi();
   const todayRecord = currentEmp
@@ -339,8 +342,33 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
   return (
     <div className="space-y-6 w-full max-w-full">
-      {/* 1. PERSONAL CLOCK-IN/OUT CARD FOR LOGGED-IN EMPLOYEE */}
-      {isEmployeeRole && currentEmp && (
+      {/* SENIOR ADMIN EXEMPTION NOTICE */}
+      {isSeniorAdmin && (
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-5 rounded-3xl shadow-md border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold text-base shrink-0 border border-amber-500/30">
+              <ShieldCheck className="w-6 h-6 text-amber-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-sm text-white">مدیریت ارشد کارگاه (مجید نورایی)</h3>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                  معاف از ثبت ساعت ورود و خروج و مرخصی
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                بر اساس مصوبه کارگاه، کلیه مدیران سطوح مختلف (منابع انسانی، مالی، سرپرستی کارگاه) و پرسنل ملزم به ثبت دقیق ورود و خروج هستند.
+              </p>
+            </div>
+          </div>
+          <div className="text-[11px] text-indigo-200 bg-white/10 px-3.5 py-2 rounded-xl border border-white/10 shrink-0 font-medium text-center">
+            نظارت و مدیریت تردد کلیه پرسنل و مدیران در پنل زیر
+          </div>
+        </div>
+      )}
+
+      {/* 1. PERSONAL CLOCK-IN/OUT CARD FOR LOGGED-IN MANAGER OR EMPLOYEE */}
+      {!isSeniorAdmin && currentEmp && (
         <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white p-5 lg:p-6 rounded-3xl shadow-lg border border-slate-800 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
             <div className="flex items-center gap-3">
@@ -352,10 +380,27 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                 )}
               </div>
               <div>
-                <h3 className="font-bold text-base text-white">
-                  میز کار شخصی: {currentEmp.firstName} {currentEmp.lastName}
-                </h3>
-                <p className="text-xs text-indigo-200">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-bold text-base text-white">
+                    میز کار شخصی: {currentEmp.firstName} {currentEmp.lastName}
+                  </h3>
+                  {currentEmp.isHrManager && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/25 text-purple-200 border border-purple-400/30">
+                      مدیر منابع انسانی
+                    </span>
+                  )}
+                  {currentEmp.isFinanceManager && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/25 text-teal-200 border border-teal-400/30">
+                      مدیر منابع مالی
+                    </span>
+                  )}
+                  {currentEmp.hasResponsibilityAllowance && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/25 text-indigo-200 border border-indigo-400/30">
+                      حق مسئولیت: {currentEmp.responsibilityAllowanceType === 'PERCENTAGE' ? `${currentEmp.responsibilityAllowanceValue}٪` : `${formatCurrencyTomans(currentEmp.responsibilityAllowanceValue || 0)}`}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-indigo-200 mt-0.5">
                   {currentEmp.position} | کد پرسنلی: {currentEmp.personalCode}
                 </p>
               </div>
@@ -389,7 +434,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
               {currentEmp?.allowManualAttendance ? (
                 <div className="px-3.5 py-2.5 rounded-2xl bg-emerald-500/20 text-emerald-200 text-xs font-bold border border-emerald-400/30 flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  <span>ثبت تردد دستی بدون نیاز به QR فعال است</span>
+                  <span>ثبت با کد پرسنلی (بدون نیاز به QR) فعال است</span>
                 </div>
               ) : (
                 <button
@@ -409,7 +454,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                   className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg hover:shadow-emerald-500/25 transition-all cursor-pointer"
                 >
                   <LogIn className="w-4 h-4" />
-                  <span>{currentEmp?.allowManualAttendance ? 'ثبت ورود دستی' : 'ثبت ورود فوری'}</span>
+                  <span>{currentEmp?.allowManualAttendance ? 'ثبت ورود با کد (دستی)' : 'ثبت ورود فوری'}</span>
                 </button>
               ) : !todayRecord.checkOutTime ? (
                 <button
@@ -418,7 +463,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                   className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg hover:shadow-rose-500/25 transition-all cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
-                  <span>{currentEmp?.allowManualAttendance ? 'ثبت خروج دستی' : 'ثبت خروج و محاسبه اضافه‌کار'}</span>
+                  <span>{currentEmp?.allowManualAttendance ? 'ثبت خروج با کد (دستی)' : 'ثبت خروج و محاسبه اضافه‌کار'}</span>
                 </button>
               ) : (
                 <div className="px-4 py-2.5 rounded-2xl bg-white/10 text-emerald-300 text-xs font-semibold border border-emerald-500/30">
@@ -629,8 +674,25 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                         </div>
                       )}
                       <div>
-                        <div className="font-bold text-slate-900 text-xs sm:text-sm">
-                          {emp ? `${emp.firstName} ${emp.lastName}` : rec.employeeId}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-slate-900 text-xs sm:text-sm">
+                            {emp ? `${emp.firstName} ${emp.lastName}` : rec.employeeId}
+                          </span>
+                          {emp?.isHrManager && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                              مدیر منابع انسانی
+                            </span>
+                          )}
+                          {emp?.isFinanceManager && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-teal-100 text-teal-800 border border-teal-200">
+                              مدیر مالی
+                            </span>
+                          )}
+                          {emp?.hasResponsibilityAllowance && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                              حق مسئولیت
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] text-slate-400 mt-0.5">
                           {emp?.position} <span className="font-mono text-slate-500">({emp?.personalCode})</span>
@@ -736,10 +798,27 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                             </div>
                           )}
                           <div>
-                            <div className="font-bold text-slate-900 text-xs">
-                              {emp ? `${emp.firstName} ${emp.lastName}` : rec.employeeId}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-slate-900 text-xs">
+                                {emp ? `${emp.firstName} ${emp.lastName}` : rec.employeeId}
+                              </span>
+                              {emp?.isHrManager && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                                  مدیر منابع انسانی
+                                </span>
+                              )}
+                              {emp?.isFinanceManager && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-teal-100 text-teal-800 border border-teal-200">
+                                  مدیر مالی
+                                </span>
+                              )}
+                              {emp?.hasResponsibilityAllowance && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                  حق مسئولیت
+                                </span>
+                              )}
                             </div>
-                            <span className="block text-[11px] font-normal text-slate-400">
+                            <span className="block text-[11px] font-normal text-slate-400 mt-0.5">
                               {emp?.position}
                             </span>
                           </div>
@@ -1394,7 +1473,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                 >
                   {employees.map((emp) => (
                     <option key={emp.id} value={emp.id}>
-                      {emp.firstName} {emp.lastName} ({emp.personalCode} - {emp.position})
+                      {emp.firstName} {emp.lastName} ({emp.personalCode} - {emp.position}{emp.isHrManager ? ' - مدیر منابع انسانی' : emp.isFinanceManager ? ' - مدیر مالی' : ''})
                     </option>
                   ))}
                 </select>

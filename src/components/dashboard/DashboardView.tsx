@@ -48,6 +48,8 @@ import {
   Home,
   CheckCheck,
   CalendarClock,
+  ClipboardList,
+  Banknote,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -95,6 +97,7 @@ interface DashboardViewProps {
   auditLogs?: AuditLog[];
   onNavigate: (tab: NavTab) => void;
   onQuickClockIn?: () => void;
+  onOpenQuickMiscPayment?: () => void;
   onRefresh?: () => void;
 }
 
@@ -109,13 +112,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   salaries,
   auditLogs = [],
   onNavigate,
+  onOpenQuickMiscPayment,
   onRefresh,
 }) => {
   const shamsi = getTodayShamsiDetailed();
   const [settings, setSettings] = useState<CompanySettings>(() => StorageService.getSettings());
   const [timeStr, setTimeStr] = useState('');
   const [activeAlertTab, setActiveAlertTab] = useState<AlertFilterTab>('ALL');
-  const [dashboardTab, setDashboardTab] = useState<'REQUESTS' | 'PRESENCE' | 'TRENDS' | 'LOGS'>('REQUESTS');
+  const [dashboardTab, setDashboardTab] = useState<'REQUESTS' | 'PRESENCE' | 'WORK_REPORTS' | 'TRENDS' | 'LOGS'>('REQUESTS');
   const [actionFeedback, setActionFeedback] = useState<{ text: string; success: boolean } | null>(null);
 
   // Quick Action Registration Modal State
@@ -270,6 +274,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     pendingSentFinancialReminders.length;
 
   const totalAlertsWithNotCheckedOut = totalUrgentCount + notCheckedOutEmployees.length;
+
+  // Work Reports (گزارش‌های کار روزانه پرسنل و مدیران)
+  const allWorkReports = StorageService.getWorkReports(currentUser);
+  const todayWorkReports = allWorkReports.filter((r) => r.date === getTodayShamsi());
+  const pendingWorkReports = allWorkReports.filter((r) => r.status !== 'ACKNOWLEDGED');
 
   // -------------------------------------------------------------
   // INLINE APPROVAL / REJECTION HANDLERS
@@ -807,6 +816,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
+      {/* Daily Work Reports Dedicated Quick Banner */}
+      <div
+        onClick={() => onNavigate('work-reports')}
+        className="p-3 sm:p-4 rounded-3xl bg-gradient-to-r from-teal-50 via-emerald-50 to-indigo-50 border border-teal-200/90 hover:border-teal-400 flex items-center justify-between cursor-pointer transition-all shadow-2xs hover:shadow-xs group"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-2xl bg-teal-600 text-white flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-xs">
+            <ClipboardList className="w-5 h-5 text-teal-100" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-black text-xs sm:text-sm text-teal-950">گزارش‌های کار روزانه پرسنل و مدیران</span>
+              {pendingWorkReports.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse">
+                  {formatNumberFa(pendingWorkReports.length)} در انتظار تایید و بازخورد
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-teal-800/80 mt-0.5 truncate">
+              {todayWorkReports.length > 0
+                ? `${formatNumberFa(todayWorkReports.length)} گزارش کار برای امروز ثبت شده است. کلیک جهت مشاهده سوابق، تایید و ثبت گزارش جدید.`
+                : 'مشاهده گزارش‌های کار کلیه پرسنل، ثبت گزارش کار روزانه جدید و ثبت نظر یا بازخورد مدیریتی'}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs font-bold text-teal-800 group-hover:text-teal-950 shrink-0 mr-2">
+          <span className="hidden sm:inline">مشاهده و ثبت گزارش</span>
+          <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+        </div>
+      </div>
+
       {/* ========================================================= */}
       {/* 3. QUICK ACTIONS GRID (میز کار و دسترسی سریع عملیاتی)      */}
       {/* ========================================================= */}
@@ -827,8 +867,48 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </span>
         </div>
 
-        {/* 3 columns on mobile, 5 on tablet, 9 on desktop */}
-        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2 sm:gap-2.5">
+        {/* 3 columns on mobile, 5 on tablet, 9+ on desktop */}
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-11 gap-2 sm:gap-2.5">
+          {/* Quick Action: Daily Work Reports */}
+          <button
+            type="button"
+            onClick={() => onNavigate('work-reports')}
+            className="p-2.5 sm:p-3 rounded-2xl bg-teal-50 hover:bg-teal-100/90 text-teal-950 border border-teal-200/90 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer group text-center relative shadow-2xs"
+          >
+            {pendingWorkReports.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-600 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-xs animate-bounce">
+                {pendingWorkReports.length}
+              </span>
+            )}
+            <div className="w-8 h-8 rounded-xl bg-teal-500/15 text-teal-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <ClipboardList className="w-4 h-4 text-teal-600" />
+            </div>
+            <div className="min-w-0 w-full">
+              <span className="text-[11px] font-bold block truncate">گزارش کار</span>
+              <span className="text-[8px] text-teal-700 font-medium block truncate">ثبت و مشاهده</span>
+            </div>
+          </button>
+
+          {/* Quick Action: Miscellaneous Payments */}
+          <button
+            type="button"
+            onClick={() => {
+              if (onOpenQuickMiscPayment) {
+                onOpenQuickMiscPayment();
+              } else {
+                onNavigate('financial-reminders');
+              }
+            }}
+            className="p-2.5 sm:p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100/90 text-emerald-950 border border-emerald-200/90 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer group text-center shadow-2xs"
+          >
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Banknote className="w-4 h-4 text-emerald-600" />
+            </div>
+            <div className="min-w-0 w-full">
+              <span className="text-[11px] font-bold block truncate">واریزی متفرقه</span>
+              <span className="text-[8px] text-emerald-700 font-medium block truncate">خارج از مساعده</span>
+            </div>
+          </button>
           {/* Quick Action 1: Workshop Alarms & Chimes Shortcut */}
           <button
             type="button"
@@ -1023,6 +1103,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-800 font-mono font-bold">
                 {formatNumberFa(presentCount)}
               </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setDashboardTab('WORK_REPORTS')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                dashboardTab === 'WORK_REPORTS'
+                  ? 'bg-white text-indigo-950 shadow-xs font-black'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <ClipboardList className={`w-3.5 h-3.5 ${dashboardTab === 'WORK_REPORTS' ? 'text-teal-600' : 'text-slate-400'}`} />
+              <span>گزارش‌های کار روزانه</span>
+              {pendingWorkReports.length > 0 ? (
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-teal-600 text-white font-mono font-bold animate-pulse">
+                  {formatNumberFa(pendingWorkReports.length)}
+                </span>
+              ) : allWorkReports.length > 0 ? (
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono font-bold">
+                  {formatNumberFa(allWorkReports.length)}
+                </span>
+              ) : null}
             </button>
 
             <button
@@ -1833,6 +1935,162 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       </div>
+      )}
+
+      {/* Tab: Daily Work Reports Overview */}
+      {dashboardTab === 'WORK_REPORTS' && (
+        <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-2xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <ClipboardList className="w-5 h-5 text-teal-600" />
+                <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">
+                  گزارش‌های کار روزانه پرسنل و مدیران کارگاه
+                </h3>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                ثبت عملکرد روزانه، اقدامات تولیدی، ماشین‌کاری و امور اداری پرسنل و مدیران
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onNavigate('work-reports')}
+              className="px-4 py-2 bg-gradient-to-r from-teal-600 to-indigo-700 hover:from-teal-700 hover:to-indigo-800 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+            >
+              <ClipboardList className="w-4 h-4 text-teal-200" />
+              <span>ورود به سامانه کامل گزارش کار ←</span>
+            </button>
+          </div>
+
+          {/* 3 Metric Pills */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] text-slate-500 font-medium">کل گزارش‌های ثبت‌شده:</span>
+                <div className="text-lg font-black text-slate-800 font-mono mt-0.5">{formatNumberFa(allWorkReports.length)} مورد</div>
+              </div>
+              <div className="w-8 h-8 rounded-xl bg-slate-200/70 text-slate-700 flex items-center justify-center">
+                <FileText className="w-4 h-4" />
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-teal-50/80 rounded-2xl border border-teal-100 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] text-teal-700 font-medium">گزارش‌های امروز:</span>
+                <div className="text-lg font-black text-teal-900 font-mono mt-0.5">{formatNumberFa(todayWorkReports.length)} مورد</div>
+              </div>
+              <div className="w-8 h-8 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center">
+                <Clock className="w-4 h-4" />
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-amber-50/80 rounded-2xl border border-amber-100 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] text-amber-700 font-medium">در انتظار بررسی مدیریت:</span>
+                <div className="text-lg font-black text-amber-900 font-mono mt-0.5">{formatNumberFa(pendingWorkReports.length)} مورد</div>
+              </div>
+              <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                <AlertCircle className="w-4 h-4" />
+              </div>
+            </div>
+          </div>
+
+          {/* Reports List */}
+          <div className="space-y-3 pt-2">
+            {allWorkReports.length === 0 ? (
+              <div className="text-center py-10 bg-slate-50/60 rounded-2xl border border-dashed border-slate-200 space-y-2">
+                <ClipboardList className="w-8 h-8 text-slate-300 mx-auto" />
+                <p className="text-xs text-slate-500 font-medium">
+                  تاکنون هیچ گزارش کاری در سامانه ثبت نشده است.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('work-reports')}
+                  className="px-3.5 py-1.5 rounded-xl bg-teal-600 text-white text-xs font-bold hover:bg-teal-700 transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>ثبت اولین گزارش کار</span>
+                </button>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 border border-slate-100 rounded-2xl overflow-hidden">
+                {allWorkReports.slice(0, 5).map((rep) => {
+                  const isAck = rep.status === 'ACKNOWLEDGED';
+                  return (
+                    <div key={rep.id} className="p-3.5 sm:p-4 hover:bg-slate-50/80 transition-colors space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-slate-900 text-xs sm:text-sm">
+                            {rep.employeeName}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {rep.date}
+                          </span>
+                          {rep.hoursSpent && (
+                            <span className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-mono">
+                              {rep.hoursSpent} ساعت کارکرد
+                            </span>
+                          )}
+                          {(rep.tags || []).map((tag, i) => (
+                            <span key={i} className="text-[10px] bg-teal-50 text-teal-800 border border-teal-200 px-2 py-0.5 rounded-md">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isAck ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>بررسی شده توسط {rep.seenBy || 'مدیر'}</span>
+                            </span>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                                <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                <span>در انتظار بررسی</span>
+                              </span>
+                              {(currentUser?.role === 'ADMIN' || currentUser?.isHrManager || currentUser?.role === 'MANAGER') && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    StorageService.reviewWorkReport(rep.id, 'مشاهده و تایید شد', currentUser?.name || 'مدیر');
+                                    showFeedback('✓ گزارش کار با موفقیت تایید و نشان مشاهده ثبت شد.');
+                                    onRefresh?.();
+                                  }}
+                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg transition-colors cursor-pointer"
+                                >
+                                  تایید و ثبت نظر
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-slate-700 font-medium">
+                        <div className="font-bold text-slate-900">{rep.title}</div>
+                        <p className="text-slate-600 text-xs mt-1 leading-relaxed whitespace-pre-line line-clamp-2">
+                          {rep.content}
+                        </p>
+                      </div>
+
+                      {rep.adminFeedback && (
+                        <div className="p-2.5 bg-emerald-50/70 border border-emerald-200/80 rounded-xl text-xs text-emerald-900 flex items-start gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold text-[11px] text-emerald-800">نظر مدیر ({rep.feedbackBy || 'مدیر'}): </span>
+                            <span className="text-[11px]">{rep.adminFeedback}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Tab 3: Weekly Attendance Trend Chart */}

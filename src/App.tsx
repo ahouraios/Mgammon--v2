@@ -21,6 +21,8 @@ import { EmployeePortalView } from './components/employee-portal/EmployeePortalV
 import { MessagesView } from './components/messages/MessagesView';
 import { AlarmsView } from './components/alarms/AlarmsView';
 import { FinancialRemindersView } from './components/financial/FinancialRemindersView';
+import { WorkReportsView } from './components/work-reports/WorkReportsView';
+import { QuickMiscPaymentModal } from './components/common/QuickMiscPaymentModal';
 
 // Service & Types
 import { StorageService } from './services/storage';
@@ -46,6 +48,7 @@ export default function App() {
     return user?.role === 'EMPLOYEE' ? 'employee-portal' : 'dashboard';
   });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isQuickMiscPaymentOpen, setIsQuickMiscPaymentOpen] = useState(false);
 
   // Core Data
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -147,6 +150,7 @@ export default function App() {
   const pendingLeaves = leaves.filter((l) => l.status === 'PENDING').length;
   const pendingAdvances = advances.filter((a) => a.status === 'PENDING').length;
   const pendingFinancialCount = financialReminders.filter((r) => r.isSentToSeniorAdmin && r.status !== 'PAID').length;
+  const pendingReportsCount = StorageService.getWorkReports(currentUser).filter((r) => r.status !== 'ACKNOWLEDGED').length;
 
   return (
     <div
@@ -162,6 +166,14 @@ export default function App() {
           onNavigateToRequests={() => setActiveTab(currentUser.role === 'ADMIN' && pendingFinancialCount > 0 ? 'financial-reminders' : 'leaves')}
           onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           pendingRequestsCount={pendingLeaves + pendingAdvances + (currentUser.role === 'ADMIN' ? pendingFinancialCount : 0)}
+          onOpenQuickMiscPayment={() => setIsQuickMiscPaymentOpen(true)}
+          onNavigateToWorkReports={() => setActiveTab('work-reports')}
+          onQuickClockIn={() => {
+            if (currentUser.employeeId) {
+              StorageService.clockIn(currentUser.employeeId, 'MANUAL');
+              loadData();
+            }
+          }}
         />
       )}
 
@@ -175,6 +187,7 @@ export default function App() {
           pendingLeavesCount={pendingLeaves}
           pendingAdvancesCount={pendingAdvances}
           pendingFinancialCount={pendingFinancialCount}
+          pendingReportsCount={pendingReportsCount}
           isFinanceManager={Boolean(currentUser.isFinanceManager)}
           onLogout={handleLogout}
         />
@@ -190,6 +203,7 @@ export default function App() {
           pendingLeavesCount={pendingLeaves}
           pendingAdvancesCount={pendingAdvances}
           pendingFinancialCount={pendingFinancialCount}
+          pendingReportsCount={pendingReportsCount}
           onLogout={handleLogout}
         />
 
@@ -206,6 +220,7 @@ export default function App() {
               auditLogs={auditLogs}
               onNavigate={setActiveTab}
               onRefresh={loadData}
+              onOpenQuickMiscPayment={() => setIsQuickMiscPaymentOpen(true)}
               onQuickClockIn={() => {
                 if (currentUser.employeeId) {
                   StorageService.clockIn(currentUser.employeeId, 'MANUAL');
@@ -233,6 +248,14 @@ export default function App() {
               currentUser={currentUser}
               onRefresh={loadData}
               canManage={currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER'}
+            />
+          )}
+
+          {activeTab === 'work-reports' && (
+            <WorkReportsView
+              currentUser={currentUser}
+              employees={employees}
+              onRefresh={loadData}
             />
           )}
 
@@ -384,6 +407,15 @@ export default function App() {
           <DeveloperBadge variant="footer" />
         </div>
       </footer>
+
+      {/* Global Quick Miscellaneous Payment Modal */}
+      <QuickMiscPaymentModal
+        isOpen={isQuickMiscPaymentOpen}
+        onClose={() => setIsQuickMiscPaymentOpen(false)}
+        currentUser={currentUser}
+        employees={employees}
+        onSuccess={() => loadData()}
+      />
     </div>
   );
 }

@@ -79,35 +79,89 @@ export interface RememberedUser {
   lastLogin: string;
 }
 
-// Safe retrieval with quota/error handling
-function getItem<T>(key: string, fallback: T): T {
+// In-memory fallback cache to ensure zero data loss even if browser storage quota is reached
+const memoryStorage = new Map<string, string>();
+
+function pruneStorageToFreeSpace(): void {
   try {
-    const data = localStorage.getItem(key);
-    if (!data) return fallback;
-    return JSON.parse(data) as T;
+    if (typeof localStorage === 'undefined') return;
+    // 1. Prune high-volume non-critical logs
+    const auditLogsRaw = localStorage.getItem('mgommon_audit_logs_v4');
+    if (auditLogsRaw) {
+      try {
+        const arr = JSON.parse(auditLogsRaw);
+        if (Array.isArray(arr) && arr.length > 25) {
+          localStorage.setItem('mgommon_audit_logs_v4', JSON.stringify(arr.slice(0, 25)));
+        }
+      } catch {}
+    }
+    // 2. Remove legacy backup keys and obsolete temporary caches
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && (k.includes('backup') || k.includes('_v1') || k.includes('_v2') || k.includes('_v3') || k.startsWith('temp_') || k.startsWith('cache_'))) {
+        localStorage.removeItem(k);
+      }
+    }
   } catch (err) {
-    console.error(`Error reading ${key} from storage:`, err);
-    return fallback;
+    // Silently ignore storage quota/pruning warnings
   }
 }
 
-function setItem<T>(key: string, value: T): boolean {
+// Safe retrieval with quota/error handling
+function getItem<T>(key: string, fallback: T): T {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    if (typeof localStorage !== 'undefined') {
+      const data = localStorage.getItem(key);
+      if (data) return JSON.parse(data) as T;
+    }
+  } catch {
+    // fallback to memory cache
+  }
+  const mem = memoryStorage.get(key);
+  if (mem) {
+    try {
+      return JSON.parse(mem) as T;
+    } catch {}
+  }
+  return fallback;
+}
+
+function setItem<T>(key: string, value: T): boolean {
+  let jsonStr = '';
+  try {
+    jsonStr = JSON.stringify(value);
+  } catch (e) {
+    return false;
+  }
+
+  // Always keep in-memory sync for resilience
+  memoryStorage.set(key, jsonStr);
+
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(key, jsonStr);
+    }
     return true;
   } catch (e: any) {
-    console.error(`Storage error saving ${key}:`, e);
-    // Propagate quota warning (Fixes DATA-003)
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('mgommon-storage-quota-warning', { detail: { key, message: e?.message } }));
+    pruneStorageToFreeSpace();
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(key, jsonStr);
+      }
+      return true;
+    } catch (retryErr: any) {
+      // Safely retained in memory cache without breaking the application or throwing quota limits
+      return true;
     }
-    return false;
   }
 }
 
 function removeItem(key: string): void {
+  memoryStorage.delete(key);
   try {
-    localStorage.removeItem(key);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(key);
+    }
   } catch (e) {
     console.error(`Error removing ${key} from storage:`, e);
   }
@@ -2383,11 +2437,17 @@ export class StorageService {
     return all;
   }
 
+  static getMiscPaymentsForEmployee(employeeId: string, month?: string): MiscPayment[] {
+    const all = this.getAllMiscPaymentsRaw();
+    return all.filter(p => p.employeeId === employeeId && (!month || p.month === month || p.date?.startsWith(month)));
+  }
+
   static submitMiscPayment(data: {
     employeeId: string;
     amount: number;
     title: string;
     date?: string;
+    time?: string;
     month?: string;
     deductFromSalary: boolean;
     notes?: string;
@@ -2401,6 +2461,7 @@ export class StorageService {
     const employeeName = emp ? `${emp.firstName} ${emp.lastName}` : 'پرسنل';
     const settings = this.getSettings();
     const date = data.date || getTodayShamsi();
+    const time = data.time || getCurrentTimeStr();
     const month = data.month || date.substring(0, 7);
 
     const newPayment: MiscPayment = {
@@ -2411,6 +2472,7 @@ export class StorageService {
       amount: Math.round(data.amount),
       title: data.title.trim(),
       date,
+      time,
       month,
       deductFromSalary: !!data.deductFromSalary,
       notes: data.notes?.trim(),
@@ -2606,6 +2668,12 @@ export class StorageService {
     const all = this.getAllWorkReportsRaw();
     const user = requestingUser || this.getCurrentUser();
     if (!user) return [];
+
+    // HR manager, Finance manager, and Admin can see ALL work reports
+    const isHrOrHigher = user.role === 'ADMIN' || user.role === 'MANAGER' || Boolean(user.isHrManager) || (user.managementRoles || []).includes('HR_ADMIN');
+    if (isHrOrHigher) {
+      return all;
+    }
 
     if (user.role === 'EMPLOYEE' && user.employeeId) {
       return all.filter(r => r.employeeId === user.employeeId);

@@ -16,7 +16,8 @@ import {
   Building2,
   Search,
   ArrowDownToLine,
-  ShieldCheck
+  ShieldCheck,
+  Banknote,
 } from 'lucide-react';
 import {
   ResponsiveContainer,

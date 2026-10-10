@@ -17,7 +17,8 @@ import {
   Camera,
   LogOut,
   Bell,
-  Receipt
+  Receipt,
+  ClipboardList
 } from 'lucide-react';
 import { Role } from '../../types';
 import { DeveloperBadge } from './DeveloperBadge';
@@ -26,6 +27,7 @@ export type NavTab =
   | 'dashboard'
   | 'employees'
   | 'attendance'
+  | 'work-reports'
   | 'qr-kiosk'
   | 'schedules'
   | 'alarms'
@@ -46,6 +48,7 @@ interface SidebarProps {
   pendingLeavesCount: number;
   pendingAdvancesCount: number;
   pendingFinancialCount?: number;
+  pendingReportsCount?: number;
   isFinanceManager?: boolean;
   onLogout?: () => void;
 }
@@ -58,6 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   pendingLeavesCount,
   pendingAdvancesCount,
   pendingFinancialCount = 0,
+  pendingReportsCount = 0,
   isFinanceManager = false,
   onLogout,
 }) => {
@@ -68,6 +72,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       const base = [
         { id: 'employee-portal' as NavTab, label: 'میز کار پرسنلی', icon: UserCheck, count: 0 },
         { id: 'attendance' as NavTab, label: 'تردد و اسکن با دوربین', icon: Camera, count: 0 },
+        { id: 'work-reports' as NavTab, label: 'گزارش‌های کار من', icon: ClipboardList, count: 0 },
         { id: 'qr-kiosk' as NavTab, label: 'پوستر بارکدهای کارگاه', icon: Printer, count: 0 },
         { id: 'leaves' as NavTab, label: 'درخواست‌های مرخصی', icon: PlaneTakeoff, count: 0 },
         { id: 'advances' as NavTab, label: 'درخواست مساعده', icon: Wallet, count: 0 },
@@ -82,9 +87,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (activeRole === 'MANAGER') {
       return [
         { id: 'dashboard' as NavTab, label: 'داشبورد مدیریتی', icon: LayoutDashboard, count: 0 },
+        { id: 'employee-portal' as NavTab, label: 'میز کار پرسنلی من', icon: UserCheck, count: 0 },
         { id: 'alarms' as NavTab, label: 'زنگ و آلارم کارگاه', icon: Bell, count: 0 },
         { id: 'employees' as NavTab, label: 'لیست پرسنل', icon: Users, count: 0 },
         { id: 'attendance' as NavTab, label: 'گزارش ترددها', icon: Clock, count: 0 },
+        { id: 'work-reports' as NavTab, label: 'گزارش‌های کار روزانه', icon: ClipboardList, count: pendingReportsCount },
         { id: 'qr-kiosk' as NavTab, label: 'چاپ پوستر بارکد کارگاه', icon: Printer, count: 0 },
         { id: 'messages' as NavTab, label: 'پیام‌ها و پیامک', icon: MessageSquare, count: 0 },
         { id: 'leaves' as NavTab, label: 'بررسی مرخصی‌ها', icon: PlaneTakeoff, count: pendingLeavesCount },
@@ -102,6 +109,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'alarms' as NavTab, label: 'زنگ و آلارم کارگاه', icon: Bell, count: 0 },
       { id: 'employees' as NavTab, label: 'مدیریت پرسنل', icon: Users, count: 0 },
       { id: 'attendance' as NavTab, label: 'مدیریت ترددها', icon: Clock, count: 0 },
+      { id: 'work-reports' as NavTab, label: 'گزارش‌های کار روزانه', icon: ClipboardList, count: pendingReportsCount },
       { id: 'qr-kiosk' as NavTab, label: 'چاپ پوستر بارکد کارگاه', icon: Printer, count: 0 },
       { id: 'schedules' as NavTab, label: 'شیفت‌ها و تقویم کاری', icon: CalendarDays, count: 0 },
       { id: 'messages' as NavTab, label: 'اطلاع‌رسانی و پیامک', icon: MessageSquare, count: 0 },

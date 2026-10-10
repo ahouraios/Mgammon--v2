@@ -23,7 +23,10 @@ import {
   BadgeAlert,
   ArrowUpRight,
   ShieldCheck,
-  CheckCheck
+  CheckCheck,
+  Banknote,
+  Coins,
+  User as UserIcon
 } from 'lucide-react';
 import {
   FinancialReminder,
@@ -31,14 +34,17 @@ import {
   FinancialReminderPriority,
   FinancialReminderStatus,
   User,
-  Employee
+  Employee,
+  MiscPayment
 } from '../../types';
 import { StorageService } from '../../services/storage';
 import {
   formatCurrencyTomans,
   getTodayShamsi,
-  toEnglishDigits
+  toEnglishDigits,
+  numberToPersianWords
 } from '../../utils/dateUtils';
+import { QuickMiscPaymentModal } from '../common/QuickMiscPaymentModal';
 
 interface FinancialRemindersViewProps {
   currentUser: User | null;
@@ -57,6 +63,19 @@ export const FinancialRemindersView: React.FC<FinancialRemindersViewProps> = ({
 }) => {
   const isSuperAdmin = currentUser?.role === 'ADMIN' || Boolean(currentUser?.isSuperAdmin);
   const isFinanceManager = Boolean(currentUser?.isFinanceManager) || currentUser?.managementRoles?.includes('FINANCE_OFFICER');
+  const isAuthorizedForMisc =
+    isSuperAdmin ||
+    isFinanceManager ||
+    Boolean(currentUser?.isHrManager) ||
+    Boolean(currentUser?.managementRoles?.includes('HR_ADMIN')) ||
+    Boolean(currentUser?.managementRoles?.includes('FINANCE_OFFICER'));
+
+  // Main Tabs
+  const [mainViewTab, setMainViewTab] = useState<'REMINDERS' | 'MISC_PAYMENTS'>('REMINDERS');
+  const [isMiscPaymentModalOpen, setIsMiscPaymentModalOpen] = useState(false);
+  const [miscPayments, setMiscPayments] = useState<MiscPayment[]>(() => StorageService.getAllMiscPaymentsRaw());
+  const [miscSearchTerm, setMiscSearchTerm] = useState('');
+  const [miscEmployeeFilter, setMiscEmployeeFilter] = useState('ALL');
 
   // Filter and search states
   const [searchTerm, setSearchTerm] = useState('');
@@ -252,6 +271,36 @@ export const FinancialRemindersView: React.FC<FinancialRemindersViewProps> = ({
   const pendingSentToAdminCount = reminders.filter(r => r.isSentToSeniorAdmin && r.status === 'PENDING').length;
   const urgentCount = reminders.filter(r => r.priority === 'URGENT' && r.status !== 'PAID').length;
 
+  // Miscellaneous Payments Stats
+  const currentMonthStr = getTodayShamsi().substring(0, 7);
+  const totalMiscSum = miscPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+  const thisMonthMiscPayments = miscPayments.filter(
+    (p) => (p.month && p.month === currentMonthStr) || (p.date && p.date.startsWith(currentMonthStr))
+  );
+  const thisMonthMiscSum = thisMonthMiscPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+  const filteredMiscPayments = miscPayments.filter((p) => {
+    if (miscEmployeeFilter !== 'ALL' && p.employeeId !== miscEmployeeFilter) return false;
+    if (miscSearchTerm.trim()) {
+      const q = miscSearchTerm.trim().toLowerCase();
+      const matchEmp = p.employeeName?.toLowerCase().includes(q);
+      const matchTitle = p.title?.toLowerCase().includes(q);
+      const matchNotes = p.notes?.toLowerCase().includes(q);
+      if (!matchEmp && !matchTitle && !matchNotes) return false;
+    }
+    return true;
+  });
+
+  const handleDeleteMiscPayment = (id: string) => {
+    if (confirm('آیا از حذف این واریزی متفرقه اطمینان دارید؟')) {
+      StorageService.deleteMiscPayment(id);
+      setMiscPayments(StorageService.getAllMiscPaymentsRaw());
+      setActionSuccess('واریزی متفرقه با موفقیت حذف گردید.');
+      setTimeout(() => setActionSuccess(null), 3000);
+      onRefresh();
+    }
+  };
+
   const getTypeBadge = (type: FinancialReminderType) => {
     switch (type) {
       case 'CHECK':
@@ -377,7 +426,18 @@ export const FinancialRemindersView: React.FC<FinancialRemindersViewProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+            {isAuthorizedForMisc && (
+              <button
+                type="button"
+                onClick={() => setIsMiscPaymentModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer border border-emerald-400/30"
+              >
+                <Banknote className="w-4 h-4" />
+                <span>ثبت سریع واریزی متفرقه</span>
+              </button>
+            )}
+
             {(isSuperAdmin || isFinanceManager || canManage) && (
               <button
                 type="button"
@@ -385,11 +445,50 @@ export const FinancialRemindersView: React.FC<FinancialRemindersViewProps> = ({
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer border border-indigo-400/30"
               >
                 <Plus className="w-4 h-4" />
-                <span>ثبت چک / قسط / صورتحساب جدید</span>
+                <span>ثبت چک / قسط / صورتحساب</span>
               </button>
             )}
           </div>
         </div>
+      </div>
+
+      {/* Main Tab Switcher */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+        <button
+          type="button"
+          onClick={() => setMainViewTab('REMINDERS')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            mainViewTab === 'REMINDERS'
+              ? 'bg-slate-900 text-white shadow-sm'
+              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+          }`}
+        >
+          <Receipt className="w-4 h-4" />
+          <span>یادآوری چک‌ها، اقساط و فاکتورها</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+            mainViewTab === 'REMINDERS' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+          }`}>
+            {reminders.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMainViewTab('MISC_PAYMENTS')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            mainViewTab === 'MISC_PAYMENTS'
+              ? 'bg-emerald-700 text-white shadow-sm'
+              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+          }`}
+        >
+          <Banknote className="w-4 h-4" />
+          <span>واریزی‌های متفرقه پرسنل (خارج از مساعده و تنخواه)</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+            mainViewTab === 'MISC_PAYMENTS' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-800'
+          }`}>
+            {miscPayments.length}
+          </span>
+        </button>
       </div>
 
       {actionSuccess && (

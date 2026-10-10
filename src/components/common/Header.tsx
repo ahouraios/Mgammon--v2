@@ -19,7 +19,9 @@ import {
   UserCog,
   Upload,
   Save,
-  LogOut
+  LogOut,
+  Banknote,
+  Coins
 } from 'lucide-react';
 import { User, Role, CompanySettings } from '../../types';
 import { getTodayShamsiDetailed } from '../../utils/dateUtils';
@@ -34,6 +36,10 @@ interface HeaderProps {
   pendingRequestsCount: number;
   onNavigateToRequests?: () => void;
   onToggleMobileMenu?: () => void;
+  onOpenQuickMiscPayment?: () => void;
+  onNavigateToMyPortal?: () => void;
+  onQuickClockIn?: () => void;
+  onNavigateToWorkReports?: () => void;
   settings?: CompanySettings;
 }
 
@@ -44,6 +50,10 @@ export const Header: React.FC<HeaderProps> = ({
   pendingRequestsCount,
   onNavigateToRequests,
   onToggleMobileMenu,
+  onOpenQuickMiscPayment,
+  onNavigateToMyPortal,
+  onQuickClockIn,
+  onNavigateToWorkReports,
   settings: settingsProp,
 }) => {
   const shamsi = getTodayShamsiDetailed();
@@ -291,6 +301,51 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right Side: Alerts, Reset, User Switcher / Login */}
           <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            {/* Quick Miscellaneous Payment Button (Admin, Finance, HR) */}
+            {(currentUser.role === 'ADMIN' ||
+              currentUser.isSuperAdmin ||
+              currentUser.isFinanceManager ||
+              currentUser.isHrManager ||
+              currentUser.managementRoles?.includes('FINANCE_OFFICER') ||
+              currentUser.managementRoles?.includes('HR_ADMIN')) &&
+              onOpenQuickMiscPayment && (
+                <button
+                  type="button"
+                  onClick={onOpenQuickMiscPayment}
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-xs font-bold transition-all shadow-xs hover:shadow-md cursor-pointer shrink-0"
+                  title="ثبت سریع واریزی متفرقه به پرسنل (خارج از مساعده و تنخواه)"
+                >
+                  <Banknote className="w-3.5 h-3.5" />
+                  <span>واریزی متفرقه</span>
+                </button>
+              )}
+
+            {/* Quick Link to Daily Work Reports */}
+            {onNavigateToWorkReports && (
+              <button
+                type="button"
+                onClick={onNavigateToWorkReports}
+                className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200/90 text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0"
+                title="مشاهده و ثبت گزارش‌های کار روزانه کارگاه"
+              >
+                <ClipboardList className="w-3.5 h-3.5 text-teal-600" />
+                <span>گزارش‌های کار</span>
+              </button>
+            )}
+
+            {/* Quick Clock-in for Managers with Employee Profile */}
+            {currentUser.employeeId && onQuickClockIn && (
+              <button
+                type="button"
+                onClick={onQuickClockIn}
+                className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-slate-700 hover:text-indigo-700 text-[11px] font-bold transition-all cursor-pointer shrink-0"
+                title="ثبت سریع تردد ورود/خروج من به عنوان مدیر"
+              >
+                <Clock className="w-3 h-3 text-indigo-600" />
+                <span>ثبت تردد من</span>
+              </button>
+            )}
+
             {/* PWA Install Button */}
             <PWAInstallButton variant="subtle" className="hidden sm:flex" />
 
@@ -367,6 +422,57 @@ export const Header: React.FC<HeaderProps> = ({
 
                   {/* Actions in Dropdown */}
                   <div className="p-2 border-t border-slate-100 space-y-1.5">
+                    {(currentUser.role === 'ADMIN' ||
+                      currentUser.isSuperAdmin ||
+                      currentUser.isFinanceManager ||
+                      currentUser.isHrManager ||
+                      currentUser.managementRoles?.includes('FINANCE_OFFICER') ||
+                      currentUser.managementRoles?.includes('HR_ADMIN')) &&
+                      onOpenQuickMiscPayment && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDropdownOpen(false);
+                            onOpenQuickMiscPayment();
+                          }}
+                          className="w-full py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors border border-emerald-200"
+                        >
+                          <Banknote className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>ثبت سریع واریزی متفرقه به پرسنل</span>
+                        </button>
+                      )}
+
+                    {onNavigateToWorkReports && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDropdownOpen(false);
+                          onNavigateToWorkReports();
+                        }}
+                        className="w-full py-2 px-3 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors border border-teal-200"
+                      >
+                        <ClipboardList className="w-3.5 h-3.5 text-teal-600" />
+                        <span>مشاهده و ثبت گزارش‌های کار روزانه</span>
+                      </button>
+                    )}
+
+                    {currentUser.employeeId && onQuickClockIn && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDropdownOpen(false);
+                          onQuickClockIn();
+                        }}
+                        className="w-full py-2 px-3 rounded-xl bg-indigo-50/80 hover:bg-indigo-100 text-indigo-800 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors border border-indigo-200"
+                      >
+                        <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>ثبت سریع تردد ورود/خروج من</span>
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={(e) => {

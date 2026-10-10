@@ -2587,6 +2587,12 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
                           <span className="font-mono">+{formatCurrencyTomans(sal.childAllowance)}</span>
                         </div>
                       )}
+                      {sal.responsibilityAllowance && sal.responsibilityAllowance > 0 ? (
+                        <div className="flex justify-between text-indigo-700 font-semibold bg-indigo-50/70 px-2 py-0.5 rounded-lg">
+                          <span>حق مسئولیت:</span>
+                          <span className="font-mono">+{formatCurrencyTomans(sal.responsibilityAllowance)}</span>
+                        </div>
+                      ) : null}
                       {sal.bonusesTotal > 0 && (
                         <div className="flex justify-between text-emerald-600 font-medium">
                           <span>پاداش تشویقی و مزایا:</span>
@@ -2650,6 +2656,33 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
                         </div>
                       )}
                     </div>
+
+                    {/* Itemized Miscellaneous Payments */}
+                    {(() => {
+                      const miscList = StorageService.getAllMiscPaymentsRaw().filter(
+                        (p) =>
+                          p.employeeId === sal.employeeId &&
+                          (p.month?.replace(/-/g, '/') === sal.month?.replace(/-/g, '/') ||
+                           p.date?.replace(/-/g, '/').startsWith(sal.month?.replace(/-/g, '/')))
+                      );
+                      if (miscList.length === 0) return null;
+                      return (
+                        <div className="bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-200/80 space-y-1.5">
+                          <div className="text-[11px] font-bold text-emerald-950 flex items-center justify-between">
+                            <span>واریزی‌های متفرقه (خارج از مساعده):</span>
+                            <span className="font-mono text-emerald-700 font-bold">
+                              {formatCurrencyTomans(miscList.reduce((sum, p) => sum + p.amount, 0))}
+                            </span>
+                          </div>
+                          {miscList.map((pm) => (
+                            <div key={pm.id} className="text-[10px] text-slate-600 flex justify-between bg-white px-2 py-1 rounded border border-emerald-100">
+                              <span>{pm.title} ({pm.date} {pm.time ? `- ساعت ${pm.time}` : ''})</span>
+                              <span className="font-mono font-bold text-emerald-700">+{formatCurrencyTomans(pm.amount)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
 
                     {/* Net Salary Total */}
                     <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
