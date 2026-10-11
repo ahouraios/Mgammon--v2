@@ -134,7 +134,6 @@
       "position": "مدیر منابع انسانی",
       "workshopId": "ws_1",
       "username": "omid",
-      "password": "182030",
       "hireDate": "1403/01/01",
       "status": "ACTIVE",
       "contractType": "PERMANENT",
@@ -172,6 +171,165 @@
       "hasResponsibilityAllowance": true,
       "responsibilityAllowanceType": "PERCENTAGE",
       "responsibilityAllowanceValue": 15
+    },
+    {
+      "id": "emp_hr_01",
+      "companyId": "comp_mgommon_01",
+      "personalCode": "r_01",
+      "nationalCode": "0928203238",
+      "firstName": "زهرا",
+      "lastName": "شمس (مدیر منابع انسانی)",
+      "phone": "09152222222",
+      "email": "hr_manager@mgommon.ir",
+      "department": "منابع انسانی",
+      "position": "زهرا شمس (مدیر منابع انسانی)",
+      "workshopId": "ws_1",
+      "username": "hr_manager",
+      "hireDate": "1403/01/01",
+      "status": "ACTIVE",
+      "contractType": "PERMANENT",
+      "shiftId": "shift_standard_day",
+      "baseSalary": 45000000,
+      "hourlyRate": 250000,
+      "remainingLeaveDays": 26,
+      "isHrManager": true,
+      "managementRoles": [
+        "HR_ADMIN"
+      ]
+    },
+    {
+      "id": "emp_fin_01",
+      "companyId": "comp_mgommon_01",
+      "personalCode": "n_01",
+      "nationalCode": "0921418511",
+      "firstName": "مرتضی",
+      "lastName": "احمدی (مدیر مالی)",
+      "phone": "09153333333",
+      "email": "fin_manager@mgommon.ir",
+      "department": "امور مالی",
+      "position": "مرتضی احمدی (مدیر مالی)",
+      "workshopId": "ws_1",
+      "username": "fin_manager",
+      "hireDate": "1403/01/01",
+      "status": "ACTIVE",
+      "contractType": "PERMANENT",
+      "shiftId": "shift_standard_day",
+      "baseSalary": 45000000,
+      "hourlyRate": 250000,
+      "remainingLeaveDays": 26,
+      "isFinanceManager": true,
+      "managementRoles": [
+        "FINANCE_OFFICER"
+      ]
+    },
+    {
+      "id": "emp_sup_01",
+      "companyId": "comp_mgommon_01",
+      "personalCode": "p_01",
+      "nationalCode": "0921659332",
+      "firstName": "امید",
+      "lastName": "حسینی (سرپرست کارگاه)",
+      "phone": "09154444444",
+      "email": "supervisor@mgommon.ir",
+      "department": "کارگاه تولید",
+      "position": "امید حسینی (سرپرست کارگاه)",
+      "workshopId": "ws_1",
+      "username": "supervisor",
+      "hireDate": "1403/01/01",
+      "status": "ACTIVE",
+      "contractType": "PERMANENT",
+      "shiftId": "shift_standard_day",
+      "baseSalary": 45000000,
+      "hourlyRate": 250000,
+      "remainingLeaveDays": 26,
+      "managementRoles": [
+        "WORKSHOP_SUPERVISOR"
+      ]
+    },
+    {
+      "id": "emp_worker_01",
+      "companyId": "comp_mgommon_01",
+      "personalCode": "r_01",
+      "nationalCode": "0928591262",
+      "firstName": "علی",
+      "lastName": "رضایی (پرسنل کارگاه)",
+      "phone": "09155555555",
+      "email": "worker@mgommon.ir",
+      "department": "کارگاه تولید",
+      "position": "علی رضایی (پرسنل کارگاه)",
+      "workshopId": "ws_1",
+      "username": "worker",
+      "hireDate": "1403/01/01",
+      "status": "ACTIVE",
+      "contractType": "PERMANENT",
+      "shiftId": "shift_standard_day",
+      "baseSalary": 32000000,
+      "hourlyRate": 180000,
+      "remainingLeaveDays": 26,
+      "managementRoles": []
+    },
+    {
+      "firstName": "تست",
+      "lastName": "کارمند منابع انسانی",
+      "nationalCode": "0929993350",
+      "phone": "09159999999",
+      "role": "EMPLOYEE",
+      "id": "emp_1791734995770_fm59",
+      "companyId": "comp_mgommon_01",
+      "remainingLeaveDays": 26,
+      "baseSalary": 0,
+      "hourlyRate": 0,
+      "managementRoles": [],
+      "isHrManager": false,
+      "isFinanceManager": false
+    },
+    {
+      "firstName": "تست",
+      "lastName": "کارمند منابع انسانی",
+      "nationalCode": "0929994617",
+      "phone": "09159999999",
+      "role": "EMPLOYEE",
+      "id": "emp_1791735029775_ekd7",
+      "isSuperAdmin": false,
+      "companyId": "comp_mgommon_01",
+      "remainingLeaveDays": 26,
+      "baseSalary": 0,
+      "hourlyRate": 0,
+      "managementRoles": [],
+      "isHrManager": false,
+      "isFinanceManager": false
+    },
+    {
+      "firstName": "تست",
+      "lastName": "کارمند منابع انسانی",
+      "nationalCode": "0929999788",
+      "phone": "09159999999",
+      "role": "EMPLOYEE",
+      "id": "emp_1791735078684_5pb3",
+      "isSuperAdmin": false,
+      "companyId": "comp_mgommon_01",
+      "remainingLeaveDays": 26,
+      "baseSalary": 0,
+      "hourlyRate": 0,
+      "managementRoles": [],
+      "isHrManager": false,
+      "isFinanceManager": false
+    },
+    {
+      "firstName": "تست",
+      "lastName": "کارمند منابع انسانی",
+      "nationalCode": "0929995418",
+      "phone": "09159999999",
+      "role": "EMPLOYEE",
+      "id": "emp_1791735153617_t2l7",
+      "isSuperAdmin": false,
+      "companyId": "comp_mgommon_01",
+      "remainingLeaveDays": 26,
+      "baseSalary": 0,
+      "hourlyRate": 0,
+      "managementRoles": [],
+      "isHrManager": false,
+      "isFinanceManager": false
     }
   ],
   "users": [
@@ -179,21 +337,29 @@
       "id": "usr_admin",
       "companyId": "comp_mgommon_01",
       "username": "admin",
-      "passwordHash": "cb092ff074f74d9e0e52916e925166e3bb495df188ecece63b863efccbfe48fc",
+      "passwordHash": "8a7c629fa8c4610635f10e2a4310bf21fea245f77be849d8f18577b30c6ac743",
       "name": "مجید نورایی (مالک و مدیر ارشد)",
-      "email": "m.nouraei@mgommon.ir",
+      "email": "admin@mgommon.ir",
       "phone": "09151111111",
       "role": "ADMIN",
       "isSuperAdmin": true,
       "workshopId": "ws_1",
-      "passwordSalt": "ae252b84bbee211e0f6dc40384e98b97"
+      "passwordSalt": "ff9da6b0a72fe14614480f3de95cff59",
+      "managementRoles": [],
+      "permissions": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
     },
     {
       "id": "usr_emp_1790780657070",
       "companyId": "comp_mgommon_01",
       "employeeId": "emp_1790780657070",
       "username": "omid",
-      "password": "182030",
       "name": "امید میثمی",
       "email": "omid@mgommon.ir",
       "phone": "09154520433",
@@ -222,8 +388,114 @@
       ],
       "isHrManager": true,
       "isFinanceManager": true,
-      "passwordHash": "2c9252a280397f31cec663d2202eda5db0daa36c0e0989c782a56d1b37c5b18f",
-      "passwordSalt": "bfeb8c81b6e499f3bfe39919c1194d18"
+      "passwordHash": "cf946fb27cb12d7451fb7a42935c299de94249c94771d00f0e07c0e325f9c6a4",
+      "passwordSalt": "fb99dacabb4022bf6374b4572aedb75d"
+    },
+    {
+      "id": "usr_hr",
+      "companyId": "comp_mgommon_01",
+      "username": "hr_manager",
+      "name": "زهرا شمس (مدیر منابع انسانی)",
+      "email": "hr_manager@mgommon.ir",
+      "phone": "09152222222",
+      "role": "MANAGER",
+      "isSuperAdmin": false,
+      "isHrManager": true,
+      "managementRoles": [
+        "HR_ADMIN"
+      ],
+      "permissions": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        10
+      ],
+      "workshopId": "ws_1",
+      "employeeId": "emp_hr_01",
+      "passwordHash": "eea1ee2688ad694a67870974957ed53aed493d425efba69b2294c2247e519d9b",
+      "passwordSalt": "3ea7ed987fc42fb055ccb00d0ada90df"
+    },
+    {
+      "id": "usr_fin",
+      "companyId": "comp_mgommon_01",
+      "username": "fin_manager",
+      "name": "مرتضی احمدی (مدیر مالی)",
+      "email": "fin_manager@mgommon.ir",
+      "phone": "09153333333",
+      "role": "MANAGER",
+      "isSuperAdmin": false,
+      "isFinanceManager": true,
+      "managementRoles": [
+        "FINANCE_OFFICER"
+      ],
+      "permissions": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        9
+      ],
+      "workshopId": "ws_1",
+      "employeeId": "emp_fin_01",
+      "passwordHash": "c4fd4a9bdd2785b2f662f4cbd6f214b4cb60067b273420460c84ad6a663a2e28",
+      "passwordSalt": "b037bc180801e6b2b758847ba05808ea"
+    },
+    {
+      "id": "usr_supervisor",
+      "companyId": "comp_mgommon_01",
+      "username": "supervisor",
+      "name": "امید حسینی (سرپرست کارگاه)",
+      "email": "supervisor@mgommon.ir",
+      "phone": "09154444444",
+      "role": "MANAGER",
+      "isSuperAdmin": false,
+      "managementRoles": [
+        "WORKSHOP_SUPERVISOR"
+      ],
+      "permissions": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "workshopId": "ws_1",
+      "employeeId": "emp_sup_01",
+      "passwordHash": "a91396ef42d69d0d669df7ae6fdbbbadb115d5aa7c4e0a02e8ee4344c1c65dac",
+      "passwordSalt": "d2130990e7e7e827b5fce27f2950e2fe"
+    },
+    {
+      "id": "usr_worker",
+      "companyId": "comp_mgommon_01",
+      "username": "worker",
+      "name": "علی رضایی (پرسنل کارگاه)",
+      "email": "worker@mgommon.ir",
+      "phone": "09155555555",
+      "role": "EMPLOYEE",
+      "isSuperAdmin": false,
+      "managementRoles": [],
+      "permissions": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "workshopId": "ws_1",
+      "employeeId": "emp_worker_01",
+      "passwordHash": "f0c5255aec3c974ee10311afac777edda2d099f416760b775020eb7dc7b536b7",
+      "passwordSalt": "3be3c76047fda9baf85db74f99117627"
     }
   ],
   "attendance": [],
@@ -270,6 +542,358 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "log_1791735153578_5lwv",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_admin",
+      "userName": "مجید نورایی (مالک و مدیر ارشد)",
+      "action": "ورود ناموفق",
+      "resource": "امنیت",
+      "details": "رمز عبور اشتباه از IP: 127.0.0.1",
+      "timestamp": "2026-10-11T16:12:33.578Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791735153529_tg6t",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_admin",
+      "userName": "مجید نورایی (مالک و مدیر ارشد)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: admin",
+      "timestamp": "2026-10-11T16:12:33.529Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791735153503_3sxp",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_fin",
+      "userName": "مرتضی احمدی (مدیر مالی)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: fin_manager",
+      "timestamp": "2026-10-11T16:12:33.503Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791735153475_wtoy",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_hr",
+      "userName": "زهرا شمس (مدیر منابع انسانی)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: hr_manager",
+      "timestamp": "2026-10-11T16:12:33.475Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791735153448_nw8s",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_supervisor",
+      "userName": "امید حسینی (سرپرست کارگاه)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: supervisor",
+      "timestamp": "2026-10-11T16:12:33.448Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791735153423_qusn",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_worker",
+      "userName": "علی رضایی (پرسنل کارگاه)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: worker",
+      "timestamp": "2026-10-11T16:12:33.423Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791735078636_sx56",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_admin",
+      "userName": "مجید نورایی (مالک و مدیر ارشد)",
+      "action": "ورود ناموفق",
+      "resource": "امنیت",
+      "details": "رمز عبور اشتباه از IP: 127.0.0.1",
+      "timestamp": "2026-10-11T16:11:18.636Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791735078586_r52b",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_admin",
+      "userName": "مجید نورایی (مالک و مدیر ارشد)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: admin",
+      "timestamp": "2026-10-11T16:11:18.587Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791735078561_jdp2",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_fin",
+      "userName": "مرتضی احمدی (مدیر مالی)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: fin_manager",
+      "timestamp": "2026-10-11T16:11:18.561Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791735078536_tplc",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_hr",
+      "userName": "زهرا شمس (مدیر منابع انسانی)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: hr_manager",
+      "timestamp": "2026-10-11T16:11:18.536Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791735078510_6j85",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_supervisor",
+      "userName": "امید حسینی (سرپرست کارگاه)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: supervisor",
+      "timestamp": "2026-10-11T16:11:18.510Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791735078481_1cuq",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_worker",
+      "userName": "علی رضایی (پرسنل کارگاه)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: worker",
+      "timestamp": "2026-10-11T16:11:18.481Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791735029731_k0ma",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_admin",
+      "userName": "مجید نورایی (مالک و مدیر ارشد)",
+      "action": "ورود ناموفق",
+      "resource": "امنیت",
+      "details": "رمز عبور اشتباه از IP: 127.0.0.1",
+      "timestamp": "2026-10-11T16:10:29.731Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791735029676_jz0f",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_admin",
+      "userName": "مجید نورایی (مالک و مدیر ارشد)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: admin",
+      "timestamp": "2026-10-11T16:10:29.676Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791735029646_ovoa",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_fin",
+      "userName": "مرتضی احمدی (مدیر مالی)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: fin_manager",
+      "timestamp": "2026-10-11T16:10:29.646Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791735029617_664s",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_hr",
+      "userName": "زهرا شمس (مدیر منابع انسانی)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: hr_manager",
+      "timestamp": "2026-10-11T16:10:29.617Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791735029591_inry",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_supervisor",
+      "userName": "امید حسینی (سرپرست کارگاه)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: supervisor",
+      "timestamp": "2026-10-11T16:10:29.591Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791735029564_9glu",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_worker",
+      "userName": "علی رضایی (پرسنل کارگاه)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: worker",
+      "timestamp": "2026-10-11T16:10:29.564Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791734995720_t0ka",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_admin",
+      "userName": "مجید نورایی (مالک و مدیر ارشد)",
+      "action": "ورود ناموفق",
+      "resource": "امنیت",
+      "details": "رمز عبور اشتباه از IP: 127.0.0.1",
+      "timestamp": "2026-10-11T16:09:55.720Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791734995669_4tdy",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_admin",
+      "userName": "مجید نورایی (مالک و مدیر ارشد)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: admin",
+      "timestamp": "2026-10-11T16:09:55.669Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791734995642_frjy",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_fin",
+      "userName": "مرتضی احمدی (مدیر مالی)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: fin_manager",
+      "timestamp": "2026-10-11T16:09:55.642Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791734995615_23uu",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_hr",
+      "userName": "زهرا شمس (مدیر منابع انسانی)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: hr_manager",
+      "timestamp": "2026-10-11T16:09:55.615Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791734995585_lw0k",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_supervisor",
+      "userName": "امید حسینی (سرپرست کارگاه)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: supervisor",
+      "timestamp": "2026-10-11T16:09:55.585Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791734995558_2x5e",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_worker",
+      "userName": "علی رضایی (پرسنل کارگاه)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: worker",
+      "timestamp": "2026-10-11T16:09:55.558Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791734952340_pvm9",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_worker",
+      "userName": "علی رضایی (پرسنل کارگاه)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: worker",
+      "timestamp": "2026-10-11T16:09:12.340Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791734935354_sy3a",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_supervisor",
+      "userName": "امید حسینی (سرپرست کارگاه)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: supervisor",
+      "timestamp": "2026-10-11T16:08:55.354Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791734932234_xjn4",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_fin",
+      "userName": "مرتضی احمدی (مدیر مالی)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: fin_manager",
+      "timestamp": "2026-10-11T16:08:52.234Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791734928143_spzm",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_hr",
+      "userName": "زهرا شمس (مدیر منابع انسانی)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: hr_manager",
+      "timestamp": "2026-10-11T16:08:48.143Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791734924468_v85u",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_admin",
+      "userName": "مجید نورایی (مالک و مدیر ارشد)",
+      "action": "ورود ناموفق",
+      "resource": "امنیت",
+      "details": "رمز عبور اشتباه از IP: 127.0.0.1",
+      "timestamp": "2026-10-11T16:08:44.468Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791734921145_q5ii",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_admin",
+      "userName": "مجید نورایی (مالک و مدیر ارشد)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: admin",
+      "timestamp": "2026-10-11T16:08:41.145Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791734654096_r5uu",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_admin",
+      "userName": "مجید نورایی (مالک و مدیر ارشد)",
+      "action": "ورود ناموفق",
+      "resource": "امنیت",
+      "details": "رمز عبور اشتباه از IP: 127.0.0.1",
+      "timestamp": "2026-10-11T16:04:14.096Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791733890808_bfu5",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_admin",
+      "userName": "مجید نورایی (مالک و مدیر ارشد)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: admin",
+      "timestamp": "2026-10-11T15:51:30.808Z",
+      "ipAddress": "127.0.0.1"
+    },
     {
       "id": "log_1791662464104_xtbc",
       "companyId": "comp_mgommon_01",
@@ -685,6 +1309,162 @@
       "userId": "usr_emp_1790780657070",
       "createdAt": 1791662464103,
       "expiresAt": 1791748864103,
+      "rememberMe": false
+    },
+    "mg_sess_d111e423ff63debf3a5c2e63b3a6c586fbd176ce4ebb0dcc41f30a86c5258095": {
+      "userId": "usr_admin",
+      "createdAt": 1791733890808,
+      "expiresAt": 1791820290808,
+      "rememberMe": false
+    },
+    "mg_sess_e3670b5bf629e44f2a9f45e2b9a3d8d25ccb1951d3922922862bbdceaf1cf654": {
+      "userId": "usr_admin",
+      "createdAt": 1791734921144,
+      "expiresAt": 1791821321144,
+      "rememberMe": false
+    },
+    "mg_sess_a762482b2ec434bf008391f5a3045659488596de63d7e30585a4f9034b076b66": {
+      "userId": "usr_hr",
+      "createdAt": 1791734928142,
+      "expiresAt": 1791821328142,
+      "rememberMe": false
+    },
+    "mg_sess_744ee9ee6bc3d4732fa3f2ff510515bb6e55d728cf0bc35bd285a4b811f29709": {
+      "userId": "usr_fin",
+      "createdAt": 1791734932233,
+      "expiresAt": 1791821332233,
+      "rememberMe": false
+    },
+    "mg_sess_94dc994003b6ebb6f68ebaff59932a99837e4c201e238db2e4a9a7a6e5c20604": {
+      "userId": "usr_supervisor",
+      "createdAt": 1791734935354,
+      "expiresAt": 1791821335354,
+      "rememberMe": false
+    },
+    "mg_sess_025e8ad3a89e28c6c6a40d533309c8347b3f4c0effe2a37ed3ec14adb0088d8b": {
+      "userId": "usr_worker",
+      "createdAt": 1791734952339,
+      "expiresAt": 1791821352339,
+      "rememberMe": false
+    },
+    "mg_sess_4fc22190824a76d8ee235faefa6067812858488ad901b05c082168e4468ae9a9": {
+      "userId": "usr_worker",
+      "createdAt": 1791734995557,
+      "expiresAt": 1791821395557,
+      "rememberMe": false
+    },
+    "mg_sess_a777858dee68e1071d6ab0f4ab33a0592a6398b57130ed51f680771ebbffa183": {
+      "userId": "usr_supervisor",
+      "createdAt": 1791734995585,
+      "expiresAt": 1791821395585,
+      "rememberMe": false
+    },
+    "mg_sess_184b3d351d50ee3d4cf0a0907470282e630a942186a25b4badff1544e306e804": {
+      "userId": "usr_hr",
+      "createdAt": 1791734995614,
+      "expiresAt": 1791821395614,
+      "rememberMe": false
+    },
+    "mg_sess_2e17937c7e263a8a4afb0040b9c612b0e9b4a09796b582d9cfce0e0ac38ff80d": {
+      "userId": "usr_fin",
+      "createdAt": 1791734995641,
+      "expiresAt": 1791821395641,
+      "rememberMe": false
+    },
+    "mg_sess_49390d8c30040df74dce6804c2c9b40f9f8ce7f0a4582d2c3510e460da6aa9b5": {
+      "userId": "usr_admin",
+      "createdAt": 1791734995668,
+      "expiresAt": 1791821395668,
+      "rememberMe": false
+    },
+    "mg_sess_e000a0dac05e8fcd19625c680f22a058ef796c6a345a3aad2ad5ab853b10e6a0": {
+      "userId": "usr_worker",
+      "createdAt": 1791735029563,
+      "expiresAt": 1791821429563,
+      "rememberMe": false
+    },
+    "mg_sess_33cda6cf0f7cc40a0acf77e362792ef11b41941a7d7e11c19e250873ab908e77": {
+      "userId": "usr_supervisor",
+      "createdAt": 1791735029590,
+      "expiresAt": 1791821429590,
+      "rememberMe": false
+    },
+    "mg_sess_74e03f7f86997ce767af15d1588d3a98f02623c24811b887eed093d76668ff1c": {
+      "userId": "usr_hr",
+      "createdAt": 1791735029617,
+      "expiresAt": 1791821429617,
+      "rememberMe": false
+    },
+    "mg_sess_d2db5c4295c7e7ce4370ed4c9459f2e49c9d0c3bad7797e5b3449ec5df0d9fa5": {
+      "userId": "usr_fin",
+      "createdAt": 1791735029645,
+      "expiresAt": 1791821429645,
+      "rememberMe": false
+    },
+    "mg_sess_c16864e33550a83272fa7f4a879ead6b9e6a40a7bdeba3b2b49d224512b4a28f": {
+      "userId": "usr_admin",
+      "createdAt": 1791735029675,
+      "expiresAt": 1791821429675,
+      "rememberMe": false
+    },
+    "mg_sess_23b97aef21b61d51689b3848ceeff962270a889774a6b993b9cb4a2374bf881e": {
+      "userId": "usr_worker",
+      "createdAt": 1791735078480,
+      "expiresAt": 1791821478480,
+      "rememberMe": false
+    },
+    "mg_sess_abdabbd445a009a5ce256ffa6a0e459bc76e5bbefd5f24858d31d2266907de3b": {
+      "userId": "usr_supervisor",
+      "createdAt": 1791735078509,
+      "expiresAt": 1791821478509,
+      "rememberMe": false
+    },
+    "mg_sess_790ea546a868cce6860505a0a58d9b2e8e6090e1cbae7838b032f9d2e2b37e91": {
+      "userId": "usr_hr",
+      "createdAt": 1791735078535,
+      "expiresAt": 1791821478535,
+      "rememberMe": false
+    },
+    "mg_sess_072a6bd2e0ce9bc83ad2c7c749f0b0b66c854fec4f51fc69f6953c86d6f4f588": {
+      "userId": "usr_fin",
+      "createdAt": 1791735078561,
+      "expiresAt": 1791821478561,
+      "rememberMe": false
+    },
+    "mg_sess_6f1e38a58a3c6411e7cd14b51e96d33414de485e63712ab5c52072d898b3fb7f": {
+      "userId": "usr_admin",
+      "createdAt": 1791735078586,
+      "expiresAt": 1791821478586,
+      "rememberMe": false
+    },
+    "mg_sess_1200880d34d7cd91538de6671ea4ebddeeea73d8eee4d6d68ce30a89a531d738": {
+      "userId": "usr_worker",
+      "createdAt": 1791735153422,
+      "expiresAt": 1791821553422,
+      "rememberMe": false
+    },
+    "mg_sess_ed72ec669803f7f31bc71277df46f9186bce41bc9a23010f6cedfc41dcef0765": {
+      "userId": "usr_supervisor",
+      "createdAt": 1791735153448,
+      "expiresAt": 1791821553448,
+      "rememberMe": false
+    },
+    "mg_sess_4bf85176b2979fe7e51d18a20921cf5f040efe17352fa858b1505a3666778a8d": {
+      "userId": "usr_hr",
+      "createdAt": 1791735153474,
+      "expiresAt": 1791821553474,
+      "rememberMe": false
+    },
+    "mg_sess_ab3dd1057abb3222d4e955fa30f439754e77a103214c04452bc9eaf1978eb6ad": {
+      "userId": "usr_fin",
+      "createdAt": 1791735153502,
+      "expiresAt": 1791821553502,
+      "rememberMe": false
+    },
+    "mg_sess_2b47512f6d9789368d22b5edbcab077bf7cff93384396934f03e18beee2f5d30": {
+      "userId": "usr_admin",
+      "createdAt": 1791735153528,
+      "expiresAt": 1791821553528,
       "rememberMe": false
     }
   },

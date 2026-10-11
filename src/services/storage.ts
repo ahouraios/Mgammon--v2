@@ -181,6 +181,15 @@ export class StorageService {
     return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
   }
 
+  static getAuthHeaders(): Record<string, string> {
+    const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+  }
+
   // ==========================================================
   // AUTHENTICATION & USER MANAGEMENT
   // ==========================================================
@@ -315,14 +324,13 @@ export class StorageService {
       return { success: false, message: 'کاربری با این مشخصات یافت نشد. لطفاً نام کاربری، کد پرسنلی یا شماره موبایل را بررسی کنید.' };
     }
 
-    // 3. Password match verification (Check targetUser.password, targetEmp.password, and allow both raw & English digit forms)
-    const validPass = targetUser.password?.trim() || targetEmp?.password?.trim() || (targetUser.id === 'usr_admin' ? 'Admin@MGommon2026' : undefined);
+    // 3. Password match verification
+    const validPass = targetUser.password?.trim() || targetEmp?.password?.trim() || (targetUser.id === 'usr_admin' ? 'Admin@MGommon2026!' : undefined);
     const engValidPass = validPass ? toEnglishDigits(validPass).trim() : '';
 
     const isMatch = 
       (validPass && (rawPass === validPass || engPass === engValidPass || cleanPass === validPass.toLowerCase())) ||
-      (targetEmp?.password && (rawPass === targetEmp.password.trim() || engPass === toEnglishDigits(targetEmp.password).trim())) ||
-      (targetUser.id === 'usr_admin' && (cleanPass === 'admin@mgommon2026' || cleanPass === '123' || engPass === '123'));
+      (targetEmp?.password && (rawPass === targetEmp.password.trim() || engPass === toEnglishDigits(targetEmp.password).trim()));
 
     if (!isMatch) {
       return { success: false, message: 'رمز عبور وارد شده نادرست است. لطفاً دقت فرمایید.' };
@@ -345,7 +353,7 @@ export class StorageService {
     return { success: true, user: syncedUser };
   }
 
-  // Async server authentication with infallible client-side local fallback
+  // Async server authentication strictly authoritative
   static async authenticateAsync(
     loginId: string,
     pass: string,
@@ -411,61 +419,13 @@ export class StorageService {
         this.setCurrentUser(data.user);
         return { success: true, user: data.user };
       }
+
+      // Server rejected authentication: Authoritative response
+      return { success: false, message: data.message || 'نام کاربری یا رمز عبور وارد شده نادرست است.' };
     } catch {
-      // If network fails, proceed directly to local auth
+      // In case of complete network failure, return clear communication
+      return { success: false, message: 'خطا در ارتباط با سرور سامانه. لطفاً وضعیت شبکه خود را بررسی نمایید.' };
     }
-
-    // ALWAYS fall back to client-side localStorage authentication if server login did not find user:
-    const fallback = this.authenticate(rawLoginId, rawPassword);
-    if (fallback.success && fallback.user) {
-      if (rememberMe) {
-        localStorage.setItem(STORAGE_KEYS.REMEMBER_ME, 'true');
-      }
-      this.saveRememberedUser({
-        id: fallback.user.id,
-        name: fallback.user.name,
-        username: fallback.user.username,
-        avatarUrl: fallback.user.avatarUrl,
-        employeeId: fallback.user.employeeId,
-        phone: fallback.user.phone,
-        lastLogin: new Date().toISOString()
-      });
-
-      // Sync local authenticated session with server token
-      fetch('/api/auth/sync-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user: fallback.user })
-      }).then(r => r.json()).then(res => {
-        if (res.token) {
-          localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, res.token);
-        }
-      }).catch(() => {});
-
-      return fallback;
-    }
-
-    // Try with normalized English digits if raw failed
-    if (engLoginId !== rawLoginId || engPassword !== rawPassword) {
-      const fallbackEng = this.authenticate(engLoginId, engPassword);
-      if (fallbackEng.success && fallbackEng.user) {
-        if (rememberMe) {
-          localStorage.setItem(STORAGE_KEYS.REMEMBER_ME, 'true');
-        }
-        this.saveRememberedUser({
-          id: fallbackEng.user.id,
-          name: fallbackEng.user.name,
-          username: fallbackEng.user.username,
-          avatarUrl: fallbackEng.user.avatarUrl,
-          employeeId: fallbackEng.user.employeeId,
-          phone: fallbackEng.user.phone,
-          lastLogin: new Date().toISOString()
-        });
-        return fallbackEng;
-      }
-    }
-
-    return fallback;
   }
 
   // Check if WebAuthn / Platform Authenticator (Fingerprint/Biometric) is available on device
@@ -1114,7 +1074,7 @@ export class StorageService {
     // Sync to server database in background
     fetch('/api/auth/sync-user', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getAuthHeaders(),
       body: JSON.stringify({ user: newUser, employee: preparedEmp })
     }).catch(() => {});
 
@@ -1245,7 +1205,7 @@ export class StorageService {
     if (userToSync) {
       fetch('/api/auth/sync-user', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getAuthHeaders(),
         body: JSON.stringify({ user: userToSync, employee: preparedEmp })
       }).catch(() => {});
     }

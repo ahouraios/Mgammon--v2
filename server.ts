@@ -15,7 +15,31 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
-const QR_SECRET = process.env.QR_SECRET || 'mgommon_secret_qr_challenge_key_2026';
+const SECURITY_FILE = path.join(DATA_DIR, 'security.json');
+let securityConfig: { qrSecret: string; adminSetupKey: string; initializedAt: string } = {
+  qrSecret: '',
+  adminSetupKey: '',
+  initializedAt: ''
+};
+if (fs.existsSync(SECURITY_FILE)) {
+  try {
+    securityConfig = JSON.parse(fs.readFileSync(SECURITY_FILE, 'utf-8'));
+  } catch {}
+}
+if (!securityConfig.qrSecret) {
+  securityConfig.qrSecret = process.env.QR_SECRET || crypto.randomBytes(32).toString('hex');
+}
+if (!securityConfig.adminSetupKey) {
+  securityConfig.adminSetupKey = process.env.SUPER_ADMIN_SETUP_KEY || crypto.randomBytes(24).toString('hex');
+}
+if (!securityConfig.initializedAt) {
+  securityConfig.initializedAt = new Date().toISOString();
+}
+try {
+  fs.writeFileSync(SECURITY_FILE, JSON.stringify(securityConfig, null, 2), 'utf-8');
+  fs.writeFileSync(path.join(DATA_DIR, 'admin-setup-token.key'), securityConfig.adminSetupKey, 'utf-8');
+} catch {}
+const QR_SECRET = securityConfig.qrSecret;
 const UPLOADS_DIR = path.join(__dirname, 'public', 'uploads');
 const BANNERS_DIR = path.join(UPLOADS_DIR, 'banners');
 
@@ -539,12 +563,10 @@ const PUBLIC_API_ROUTES = new Set([
   '/api/health',
   '/api/time',
   '/api/auth/login',
-  '/api/auth/sync-user',
-  '/api/auth/sync-session',
   '/api/auth/webauthn/login-options',
   '/api/auth/webauthn/login-verify',
-  '/api/settings',
-  '/api/alarms',
+  '/api/settings/public',
+  '/api/setup/admin'
 ]);
 
 // Auth Middleware: attaches user if token is valid
@@ -574,8 +596,7 @@ app.use(authenticateToken);
 
 // Global Authorization Guard: block all unauthenticated calls to non-public /api/* routes
 app.use((req: Request, res: Response, next: NextFunction) => {
-  const isPublicAlarmAck = req.path.startsWith('/api/alarms/') && req.path.endsWith('/acknowledge');
-  if (req.path.startsWith('/api') && !PUBLIC_API_ROUTES.has(req.path) && !isPublicAlarmAck) {
+  if (req.path.startsWith('/api') && !PUBLIC_API_ROUTES.has(req.path)) {
     if (!(req as any).user) {
       return res.status(401).json({
         success: false,
@@ -586,10 +607,90 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Role & Session Authorization Guards (Fixes SEC-001..SEC-007)
+// Role & Permission Identification Helpers
+export function isSuperAdmin(user: any): boolean {
+  if (!user) return false;
+  return Boolean(user.isSuperAdmin === true || user.role === 'ADMIN');
+}
+
+export function isHrManager(user: any): boolean {
+  if (!user) return false;
+  if (isSuperAdmin(user)) return true;
+  return Boolean(
+    user.isHrManager === true ||
+    (Array.isArray(user.managementRoles) && user.managementRoles.includes('HR_ADMIN')) ||
+    (Array.isArray(user.permissions) && user.permissions.includes(10))
+  );
+}
+
+export function isFinanceManager(user: any): boolean {
+  if (!user) return false;
+  if (isSuperAdmin(user)) return true;
+  return Boolean(
+    user.isFinanceManager === true ||
+    (Array.isArray(user.managementRoles) && user.managementRoles.includes('FINANCE_OFFICER')) ||
+    (Array.isArray(user.permissions) && user.permissions.includes(9))
+  );
+}
+
+export function isWorkshopSupervisor(user: any): boolean {
+  if (!user) return false;
+  if (isSuperAdmin(user)) return true;
+  return Boolean(
+    (Array.isArray(user.managementRoles) && user.managementRoles.includes('WORKSHOP_SUPERVISOR')) ||
+    (Array.isArray(user.permissions) && (user.permissions.includes(7) || user.permissions.includes(8))) ||
+    (user.role === 'MANAGER' && !user.isHrManager && !user.isFinanceManager)
+  );
+}
+
+// Role & Session Authorization Guards (Strict Server-Side Enforced)
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!(req as any).user) {
     return res.status(401).json({ success: false, message: 'احراز هویت الزامی است. لطفاً ابتدا وارد سامانه شوید.' });
+  }
+  next();
+}
+
+function requireSuperAdmin(req: Request, res: Response, next: NextFunction) {
+  const user = (req as any).user;
+  if (!user) {
+    return res.status(401).json({ success: false, message: 'احراز هویت الزامی است.' });
+  }
+  if (!isSuperAdmin(user)) {
+    return res.status(403).json({ success: false, message: 'دسترسی غیرمجاز: این عملیات صرفاً مخصوص مدیر ارشد سامانه است.' });
+  }
+  next();
+}
+
+function requireHrOrAdmin(req: Request, res: Response, next: NextFunction) {
+  const user = (req as any).user;
+  if (!user) {
+    return res.status(401).json({ success: false, message: 'احراز هویت الزامی است.' });
+  }
+  if (!isHrManager(user)) {
+    return res.status(403).json({ success: false, message: 'دسترسی غیرمجاز: این عملیات نیازمند مجوز مدیریت منابع انسانی است.' });
+  }
+  next();
+}
+
+function requireFinanceOrAdmin(req: Request, res: Response, next: NextFunction) {
+  const user = (req as any).user;
+  if (!user) {
+    return res.status(401).json({ success: false, message: 'احراز هویت الزامی است.' });
+  }
+  if (!isFinanceManager(user)) {
+    return res.status(403).json({ success: false, message: 'دسترسی غیرمجاز: این عملیات نیازمند مجوز مدیریت مالی است.' });
+  }
+  next();
+}
+
+function requireSupervisorOrHrOrAdmin(req: Request, res: Response, next: NextFunction) {
+  const user = (req as any).user;
+  if (!user) {
+    return res.status(401).json({ success: false, message: 'احراز هویت الزامی است.' });
+  }
+  if (!isWorkshopSupervisor(user) && !isHrManager(user)) {
+    return res.status(403).json({ success: false, message: 'دسترسی غیرمجاز: این عملیات نیازمند مجوز سرپرستی کارگاه یا منابع انسانی است.' });
   }
   next();
 }
@@ -600,10 +701,10 @@ function requireRole(...allowedRoles: string[]) {
     if (!user) {
       return res.status(401).json({ success: false, message: 'احراز هویت الزامی است.' });
     }
-    if (!allowedRoles.includes(user.role) && !user.isSuperAdmin) {
-      return res.status(403).json({ success: false, message: 'دسترسی غیرمجاز: نقش شما اجازه انجام این عملیات را ندارد.' });
+    if (isSuperAdmin(user) || allowedRoles.includes(user.role)) {
+      return next();
     }
-    next();
+    return res.status(403).json({ success: false, message: 'دسترسی غیرمجاز: نقش شما اجازه انجام این عملیات را ندارد.' });
   };
 }
 
@@ -731,16 +832,13 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
     return res.status(401).json({ success: false, message: 'کاربری با این مشخصات یافت نشد.' });
   }
 
-  const isDefaultAdmin = targetUser.id === 'usr_admin' && (cleanPass === 'admin@mgommon2026' || cleanPass === '123' || engPass === '123');
   const directPassMatch = 
-    (targetUser.password && (targetUser.password.trim() === rawPass || toEnglishDigits(targetUser.password).trim() === engPass)) ||
-    (targetEmp?.password && (targetEmp.password.trim() === rawPass || toEnglishDigits(targetEmp.password).trim() === engPass));
+    Boolean(targetUser.password && (targetUser.password.trim() === rawPass || toEnglishDigits(targetUser.password).trim() === engPass));
   
   const hashPassMatch = 
-    (targetUser.passwordHash && verifyPassword(cleanPass, targetUser.passwordHash, targetUser.passwordSalt)) ||
-    (targetUser.passwordHash && verifyPassword(rawPass, targetUser.passwordHash, targetUser.passwordSalt));
+    Boolean(targetUser.passwordHash && (verifyPassword(cleanPass, targetUser.passwordHash, targetUser.passwordSalt) || verifyPassword(rawPass, targetUser.passwordHash, targetUser.passwordSalt)));
 
-  const isValid = isDefaultAdmin || directPassMatch || hashPassMatch;
+  const isValid = directPassMatch || hashPassMatch;
 
   if (!isValid) {
     failedAttempts[clientIp] = {
@@ -752,10 +850,11 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
   }
 
   // Auto-upgrade hash to per-user salt PBKDF2 if missing or default
-  if (!targetUser.passwordSalt) {
+  if (!targetUser.passwordSalt || directPassMatch) {
     const upgraded = hashPasswordWithSalt(cleanPass);
     targetUser.passwordHash = upgraded.hash;
     targetUser.passwordSalt = upgraded.salt;
+    delete targetUser.password;
   }
 
   // Reset failed attempts on success
@@ -773,7 +872,7 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
   persistDb();
 
   // Return sanitized user without passwordHash
-  const { passwordHash: _, ...sanitizedUser } = targetUser;
+  const { passwordHash: _, password: __, ...sanitizedUser } = targetUser;
   const employee = targetUser.employeeId ? db.employees.find(e => e.id === targetUser.employeeId) : undefined;
   logServerAudit(targetUser.id, targetUser.name, 'ورود به سامانه', 'احراز هویت', `ورود موفق از طریق نام کاربری: ${targetUser.username}`, clientIp);
 
@@ -785,18 +884,112 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
   });
 });
 
-// Sync user & employee from client to server (Public endpoint for client synchronization)
-app.post('/api/auth/sync-user', (req: Request, res: Response) => {
+// Bootstrap Endpoint for Initial Super Admin Setup (Documented & Cryptographically Protected)
+app.post('/api/setup/admin', (req: Request, res: Response) => {
+  const { setupKey, username, password, name, phone, allowReset } = req.body;
+  if (!setupKey || !username || !password) {
+    return res.status(400).json({ success: false, message: 'کلید راه‌اندازی (setupKey)، نام کاربری و رمز عبور الزامی است.' });
+  }
+
+  const expectedKey = securityConfig.adminSetupKey;
+  if (!expectedKey || typeof setupKey !== 'string') {
+    return res.status(403).json({ success: false, message: 'کلید راه‌اندازی نامعتبر است.' });
+  }
+
+  const setupBuf = Buffer.from(setupKey);
+  const expBuf = Buffer.from(expectedKey);
+  const keyMatches = setupBuf.length === expBuf.length && crypto.timingSafeEqual(setupBuf, expBuf);
+  if (!keyMatches) {
+    return res.status(403).json({ success: false, message: 'کلید راه‌اندازی نامعتبر است.' });
+  }
+
+  if (String(password).length < 8) {
+    return res.status(400).json({ success: false, message: 'رمز عبور مدیر ارشد باید حداقل ۸ کاراکتر باشد.' });
+  }
+
+  const existingSuperAdmin = db.users.find((u: any) => u.isSuperAdmin || u.role === 'ADMIN');
+  if (existingSuperAdmin && !allowReset) {
+    return res.status(409).json({
+      success: false,
+      message: 'مدیر ارشد قبلاً در سامانه ایجاد شده است. در صورت نیاز به بازنشانی، فیلد allowReset: true را همراه با کلید امنیتی ارسال کنید.'
+    });
+  }
+
+  const { hash, salt } = hashPasswordWithSalt(String(password).trim());
+  const adminId = existingSuperAdmin ? existingSuperAdmin.id : 'usr_admin';
+  const updatedAdmin = {
+    id: adminId,
+    companyId: db.settings?.id || 'comp_mgommon_01',
+    username: String(username).toLowerCase().trim(),
+    name: name ? String(name).trim() : 'مدیر ارشد سامانه',
+    email: `${String(username).toLowerCase().trim()}@mgommon.ir`,
+    phone: phone ? String(phone).trim() : '09151111111',
+    role: 'ADMIN',
+    isSuperAdmin: true,
+    workshopId: 'ws_1',
+    passwordHash: hash,
+    passwordSalt: salt,
+    updatedAt: new Date().toISOString()
+  };
+
+  if (existingSuperAdmin) {
+    const idx = db.users.findIndex((u: any) => u.id === existingSuperAdmin.id);
+    db.users[idx] = { ...db.users[idx], ...updatedAdmin };
+  } else {
+    db.users.unshift(updatedAdmin);
+  }
+
+  persistDb();
+  logServerAudit(adminId, updatedAdmin.name, 'راه‌اندازی مدیر ارشد', 'امنیت', 'حساب مدیر ارشد با کلید امنیتی ثبت/بازنشانی گردید.');
+
+  res.json({
+    success: true,
+    message: 'حساب مدیر ارشد با موفقیت راه‌اندازی شد.',
+    user: {
+      id: updatedAdmin.id,
+      username: updatedAdmin.username,
+      name: updatedAdmin.name,
+      role: updatedAdmin.role,
+      isSuperAdmin: updatedAdmin.isSuperAdmin
+    }
+  });
+});
+
+// Block unauthenticated sync-session to prevent session forgery
+app.post('/api/auth/sync-session', (_req: Request, res: Response) => {
+  return res.status(403).json({
+    success: false,
+    message: 'مسیر همگام‌سازی نشست بدون اعتبارسنجی مسدود است. لطفاً از طریق احراز هویت رسمی وارد شوید.'
+  });
+});
+
+// sync-user requires authentication and HR/Admin permissions, and prevents privilege escalation
+app.post('/api/auth/sync-user', requireAuth, requireHrOrAdmin, (req: Request, res: Response) => {
+  const caller = (req as any).user;
   const { user, employee } = req.body;
   if (!user || !user.username) {
     return res.status(400).json({ success: false, message: 'اطلاعات کاربر نامعتبر است' });
   }
 
+  // Prevent privilege escalation: only Super Admin can grant ADMIN or isSuperAdmin
+  if ((user.isSuperAdmin || user.role === 'ADMIN') && !isSuperAdmin(caller)) {
+    return res.status(403).json({ success: false, message: 'فقط مدیر ارشد مجاز به اعطای نقش‌های مدیریتی ارشد است.' });
+  }
+
+  const safeUser = { ...user };
+  if (!isSuperAdmin(caller)) {
+    delete safeUser.isSuperAdmin;
+    safeUser.role = 'EMPLOYEE';
+  }
+
   const existingIdx = db.users.findIndex(u => u.id === user.id || u.username.toLowerCase() === user.username.toLowerCase());
   if (existingIdx !== -1) {
-    db.users[existingIdx] = { ...db.users[existingIdx], ...user };
+    if ((db.users[existingIdx].isSuperAdmin || db.users[existingIdx].role === 'ADMIN') && !isSuperAdmin(caller)) {
+      return res.status(403).json({ success: false, message: 'ویرایش حساب مدیر ارشد امکان‌پذیر نیست.' });
+    }
+    db.users[existingIdx] = { ...db.users[existingIdx], ...safeUser };
   } else {
-    db.users.push(user);
+    db.users.push(safeUser);
   }
 
   if (employee && employee.id) {
@@ -810,32 +1003,6 @@ app.post('/api/auth/sync-user', (req: Request, res: Response) => {
 
   persistDb();
   res.json({ success: true });
-});
-
-// Sync local authenticated session with server token
-app.post('/api/auth/sync-session', (req: Request, res: Response) => {
-  const { user } = req.body;
-  if (!user || !user.id) {
-    return res.status(400).json({ success: false, message: 'کاربر نامعتبر است' });
-  }
-
-  const existingIdx = db.users.findIndex(u => u.id === user.id || u.username.toLowerCase() === user.username.toLowerCase());
-  if (existingIdx !== -1) {
-    db.users[existingIdx] = { ...db.users[existingIdx], ...user };
-  } else {
-    db.users.push(user);
-  }
-
-  const token = `mg_sess_${crypto.randomBytes(32).toString('hex')}`;
-  db.sessions[token] = {
-    userId: user.id,
-    createdAt: Date.now(),
-    expiresAt: Date.now() + 30 * 24 * 3600 * 1000,
-    rememberMe: true
-  };
-  persistDb();
-
-  res.json({ success: true, token });
 });
 
 // Verify existing session token from headers
@@ -896,8 +1063,13 @@ app.post('/api/auth/webauthn/login-verify', (req: Request, res: Response) => {
   const storedChallenge = db.webauthnChallenges[challenge];
   delete db.webauthnChallenges[challenge];
 
+  if (!credentialId) {
+    return res.status(400).json({ success: false, message: 'شناسه کلید بیومتریک (credentialId) الزامی است.' });
+  }
+
   let targetUser = storedChallenge.userId ? db.users.find(u => u.id === storedChallenge.userId) : null;
 
+  // 1. If challenge was tied to a user or loginId provided, verify against that user
   if (!targetUser && loginId) {
     const cleanId = String(loginId).trim().toLowerCase();
     targetUser = db.users.find(u =>
@@ -908,7 +1080,15 @@ app.post('/api/auth/webauthn/login-verify', (req: Request, res: Response) => {
     );
   }
 
-  if (!targetUser && credentialId && db.webauthnCredentials) {
+  // 2. Lookup registered credentials
+  if (targetUser) {
+    const userCreds = (db.webauthnCredentials && db.webauthnCredentials[targetUser.id]) || [];
+    const isRegistered = userCreds.some((c: any) => c.id === credentialId);
+    if (!isRegistered) {
+      return res.status(401).json({ success: false, message: 'کلید بیومتریک برای این حساب ثبت نشده است.' });
+    }
+  } else if (db.webauthnCredentials) {
+    // If user was not identified by loginId, search who owns this credentialId
     for (const uId in db.webauthnCredentials) {
       if (db.webauthnCredentials[uId].some((c: any) => c.id === credentialId)) {
         targetUser = db.users.find(u => u.id === uId);
@@ -917,28 +1097,8 @@ app.post('/api/auth/webauthn/login-verify', (req: Request, res: Response) => {
     }
   }
 
-  if (!targetUser && req.body.userId) {
-    targetUser = db.users.find(u => u.id === req.body.userId);
-  }
-
   if (!targetUser) {
-    // If not specified, default to the admin or first active user for high-availability biometric touch
-    targetUser = db.users.find(u => u.role === 'ADMIN' || u.isSuperAdmin) || db.users[0];
-  }
-
-  if (!targetUser) {
-    return res.status(401).json({ success: false, message: 'کاربر متصل به این اثر انگشت یافت نشد.' });
-  }
-
-  if (credentialId) {
-    if (!db.webauthnCredentials) db.webauthnCredentials = {};
-    if (!db.webauthnCredentials[targetUser.id]) db.webauthnCredentials[targetUser.id] = [];
-    if (!db.webauthnCredentials[targetUser.id].some((c: any) => c.id === credentialId)) {
-      db.webauthnCredentials[targetUser.id].push({
-        id: credentialId,
-        registeredAt: Date.now()
-      });
-    }
+    return res.status(401).json({ success: false, message: 'کاربر متصل به این اثر انگشت یافت نشد یا ثبت نشده است.' });
   }
 
   const duration = rememberMe ? 30 * 24 * 3600 * 1000 : 24 * 3600 * 1000;
@@ -951,7 +1111,7 @@ app.post('/api/auth/webauthn/login-verify', (req: Request, res: Response) => {
   };
   persistDb();
 
-  const { passwordHash: _, ...sanitizedUser } = targetUser;
+  const { passwordHash: _, password: __, ...sanitizedUser } = targetUser;
   logServerAudit(targetUser.id, targetUser.name, 'ورود با اثر انگشت', 'احراز هویت', `ورود بیومتریک موفق: ${targetUser.username}`);
 
   res.json({
@@ -1034,11 +1194,11 @@ app.get('/api/auth/me', (req: Request, res: Response) => {
   if (!user) {
     return res.status(401).json({ error: 'کاربر احراز هویت نشده است' });
   }
-  const { passwordHash: _, ...sanitized } = user;
+  const { passwordHash: _, password: __, ...sanitized } = user;
   res.json(sanitized);
 });
 
-// Worker & User Password Change Endpoint
+// Worker & User Password Change Endpoint (Strictly Enforced Verification)
 app.post('/api/auth/change-password', requireAuth, (req: Request, res: Response) => {
   const user = (req as any).user;
   const { currentPassword, newPassword } = req.body;
@@ -1047,8 +1207,11 @@ app.post('/api/auth/change-password', requireAuth, (req: Request, res: Response)
     return res.status(400).json({ success: false, message: 'رمز عبور جدید باید حداقل ۴ کاراکتر باشد.' });
   }
 
-  // If current password provided, verify it (skip if user has mustChangePassword flag or is first setup)
-  if (currentPassword && user.passwordHash) {
+  // If user is not flagged with mustChangePassword, currentPassword is mandatory
+  if (!user.mustChangePassword) {
+    if (!currentPassword) {
+      return res.status(400).json({ success: false, message: 'وارد کردن رمز عبور فعلی الزامی است.' });
+    }
     const isValid = verifyPassword(String(currentPassword).trim(), user.passwordHash, user.passwordSalt);
     if (!isValid) {
       return res.status(400).json({ success: false, message: 'رمز عبور فعلی وارد شده نادرست است.' });
@@ -1059,12 +1222,13 @@ app.post('/api/auth/change-password', requireAuth, (req: Request, res: Response)
   user.passwordHash = hash;
   user.passwordSalt = salt;
   user.mustChangePassword = false;
+  delete user.password;
 
-  // Also sync plain password on associated employee if exists
+  // Also remove plain password on associated employee if exists
   if (user.employeeId) {
     const emp = db.employees.find((e: any) => e.id === user.employeeId);
     if (emp) {
-      emp.password = String(newPassword).trim();
+      delete emp.password;
     }
   }
 
@@ -1411,8 +1575,8 @@ app.post('/api/attendance/manual-request', requireAuth, (req: Request, res: Resp
   });
 });
 
-// 6. Review Manual Attendance Request (Fixes SEC-003: restricted to ADMIN & MANAGER, authenticated reviewer)
-app.post('/api/attendance/review-manual', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+// 6. Review Manual Attendance Request
+app.post('/api/attendance/review-manual', requireSupervisorOrHrOrAdmin, (req: Request, res: Response) => {
   const reviewer = (req as any).user;
   const { recordId, action, rejectionReason } = req.body;
   const rec = db.attendance.find((a: any) => a.id === recordId);
@@ -1444,138 +1608,306 @@ app.post('/api/attendance/review-manual', requireRole('ADMIN', 'MANAGER'), (req:
   res.json({ success: true, message: action === 'APPROVE' ? 'تردد با موفقیت تایید شد.' : 'درخواست تردد رد شد.', record: rec });
 });
 
-// 7. Full CRUD for Employees (Ensuring raw write operations - Fixes DATA-001 & DATA-002)
-app.get('/api/employees', (req: Request, res: Response) => {
+// 6.5. Get Attendance Records with Authoritative Role-Based Filtering
+app.get('/api/attendance', requireAuth, (req: Request, res: Response) => {
   const user = (req as any).user;
-  // If HR Manager, hide confidential employees
-  if (user && user.role === 'MANAGER') {
-    return res.json(db.employees.filter((e: any) => !e.isConfidential));
+  if (!db.attendance) db.attendance = [];
+
+  if (user.role === 'EMPLOYEE' && user.employeeId) {
+    return res.json(db.attendance.filter((a: any) => a.employeeId === user.employeeId));
   }
-  res.json(db.employees);
+
+  if (isWorkshopSupervisor(user) && !isSuperAdmin(user) && !isHrManager(user)) {
+    const workshopId = user.workshopId;
+    if (workshopId) {
+      const empIds = db.employees.filter((e: any) => e.workshopId === workshopId).map((e: any) => e.id);
+      return res.json(db.attendance.filter((a: any) => empIds.includes(a.employeeId)));
+    }
+  }
+
+  res.json(db.attendance);
 });
 
-app.post('/api/employees', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+// 7. Full CRUD for Employees with Strict Privacy & Role-Based Sanitization
+export function sanitizeEmployeeForViewer(emp: any, user: any) {
+  if (!emp) return null;
+
+  // Super Admin and HR Manager have full file access
+  if (isSuperAdmin(user) || isHrManager(user)) {
+    const clone = { ...emp };
+    delete clone.password;
+    return clone;
+  }
+
+  // Finance Manager needs bank and salary details for payroll
+  if (isFinanceManager(user)) {
+    const clone = { ...emp };
+    delete clone.password;
+    return clone;
+  }
+
+  // Employee viewing their own profile
+  if (user && user.employeeId === emp.id) {
+    const clone = { ...emp };
+    delete clone.password;
+    return clone;
+  }
+
+  // Workshop Supervisor viewing other employees
+  if (isWorkshopSupervisor(user)) {
+    if (emp.isConfidential) return null;
+    return {
+      id: emp.id,
+      personalCode: emp.personalCode,
+      firstName: emp.firstName,
+      lastName: emp.lastName,
+      phone: emp.phone,
+      email: emp.email,
+      department: emp.department,
+      position: emp.position,
+      jobTitle: emp.jobTitle,
+      workshopId: emp.workshopId,
+      shiftId: emp.shiftId,
+      status: emp.status,
+      avatarUrl: emp.avatarUrl,
+      permissions: emp.permissions,
+      managementRoles: emp.managementRoles
+    };
+  }
+
+  // Regular Employee viewing other colleagues (Public Workshop Directory only - NO bank/salary/nationalCode)
+  return {
+    id: emp.id,
+    firstName: emp.firstName,
+    lastName: emp.lastName,
+    department: emp.department,
+    position: emp.position,
+    jobTitle: emp.jobTitle,
+    workshopId: emp.workshopId,
+    avatarUrl: emp.avatarUrl,
+    status: emp.status
+  };
+}
+
+app.get('/api/employees/me', requireAuth, (req: Request, res: Response) => {
+  const user = (req as any).user;
+  if (!user.employeeId) {
+    return res.status(404).json({ success: false, message: 'پرونده پرسنلی برای این حساب یافت نشد.' });
+  }
+  const emp = db.employees.find((e: any) => e.id === user.employeeId);
+  if (!emp) {
+    return res.status(404).json({ success: false, message: 'پرونده پرسنلی یافت نشد.' });
+  }
+  const clone = { ...emp };
+  delete clone.password;
+  res.json({ success: true, employee: clone });
+});
+
+app.get('/api/employees', requireAuth, (req: Request, res: Response) => {
+  const user = (req as any).user;
+  const sanitizedList = (db.employees || [])
+    .map((e: any) => sanitizeEmployeeForViewer(e, user))
+    .filter(Boolean);
+  res.json(sanitizedList);
+});
+
+app.get('/api/employees/:id', requireAuth, (req: Request, res: Response) => {
+  const user = (req as any).user;
+  const { id } = req.params;
+  const emp = db.employees.find((e: any) => e.id === id);
+  if (!emp) {
+    return res.status(404).json({ success: false, message: 'پرسنل یافت نشد.' });
+  }
+  const sanitized = sanitizeEmployeeForViewer(emp, user);
+  if (!sanitized) {
+    return res.status(403).json({ success: false, message: 'دسترسی به پرونده این پرسنل برای شما مجاز نیست.' });
+  }
+  res.json({ success: true, employee: sanitized });
+});
+
+app.post('/api/employees', requireAuth, requireHrOrAdmin, (req: Request, res: Response) => {
+  const caller = (req as any).user;
   const newEmp = req.body;
+
+  if ((newEmp.role === 'ADMIN' || newEmp.isSuperAdmin) && !isSuperAdmin(caller)) {
+    return res.status(403).json({
+      success: false,
+      message: 'دسترسی غیرمجاز: فقط مدیر ارشد سامانه مجاز به اعطای نقش مدیریت ارشد (ADMIN) است.'
+    });
+  }
+
   if (!newEmp.firstName || !newEmp.lastName || !newEmp.nationalCode) {
     return res.status(400).json({ success: false, message: 'اطلاعات پرسنلی ناقص است.' });
   }
 
-  // Check unique national code (Fixes EMP-001, SET-002)
   if (db.employees.some((e: any) => e.nationalCode === newEmp.nationalCode)) {
     return res.status(400).json({ success: false, message: 'کد ملی وارد شده تکراری است.' });
   }
 
-  // Check unique username
   if (newEmp.username && db.users.some((u: any) => u.username.toLowerCase() === newEmp.username.toLowerCase())) {
     return res.status(400).json({ success: false, message: 'نام کاربری وارد شده قبلاً استفاده شده است.' });
+  }
+
+  let assignedRole = 'EMPLOYEE';
+  let isSuper = false;
+  let managementRoles = Array.isArray(newEmp.managementRoles) ? newEmp.managementRoles : [];
+  let isHr = Boolean(newEmp.isHrManager);
+  let isFin = Boolean(newEmp.isFinanceManager);
+
+  if (isSuperAdmin(caller)) {
+    if (newEmp.role === 'ADMIN') assignedRole = 'ADMIN';
+    else if (newEmp.role === 'MANAGER' || isHr || isFin || managementRoles.length > 0) assignedRole = 'MANAGER';
+    isSuper = Boolean(newEmp.isSuperAdmin);
+  } else {
+    // Non-super-admin can only create regular EMPLOYEE
+    assignedRole = 'EMPLOYEE';
+    isSuper = false;
+    managementRoles = [];
+    isHr = false;
+    isFin = false;
   }
 
   const id = `emp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
   const employeeRecord = {
     ...newEmp,
     id,
-    companyId: db.settings.id,
+    role: assignedRole,
+    isSuperAdmin: isSuper,
+    companyId: db.settings?.id || 'comp_mgommon_01',
     remainingLeaveDays: newEmp.remainingLeaveDays ?? 26,
     baseSalary: Number(newEmp.baseSalary) || 0,
-    hourlyRate: Number(newEmp.hourlyRate) || 0
+    hourlyRate: Number(newEmp.hourlyRate) || 0,
+    managementRoles,
+    isHrManager: isHr,
+    isFinanceManager: isFin
   };
+  delete employeeRecord.password;
 
   db.employees.push(employeeRecord);
 
-  // Create associated user account with secure hashed password & random salt
   if (newEmp.username) {
-    const defaultPass = newEmp.password || `M@${crypto.randomBytes(4).toString('hex')}`;
-    const { hash, salt } = hashPasswordWithSalt(defaultPass);
+    const rawPass = newEmp.password || `Mg@${crypto.randomBytes(4).toString('hex')}1`;
+    const { hash, salt } = hashPasswordWithSalt(rawPass);
     db.users.push({
       id: `usr_${id}`,
-      companyId: db.settings.id,
-      username: newEmp.username,
+      companyId: db.settings?.id || 'comp_mgommon_01',
+      username: newEmp.username.toLowerCase().trim(),
       passwordHash: hash,
       passwordSalt: salt,
       name: `${newEmp.firstName} ${newEmp.lastName}`,
       email: newEmp.email || `${newEmp.username}@mgommon.ir`,
       phone: newEmp.phone,
-      role: 'EMPLOYEE',
+      role: assignedRole as any,
       employeeId: id,
-      isSuperAdmin: false,
-      workshopId: newEmp.workshopId,
+      isSuperAdmin: isSuper,
+      managementRoles,
+      isHrManager: isHr,
+      isFinanceManager: isFin,
+      workshopId: newEmp.workshopId || 'ws_1',
       mustChangePassword: true
     });
   }
 
-  if (!persistDb()) {
-    return res.status(500).json({ success: false, message: 'خطا در ذخیره‌سازی پرسنل در سرور' });
-  }
+  persistDb();
   res.json({ success: true, employee: employeeRecord });
 });
 
-app.put('/api/employees/:id', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+app.put('/api/employees/:id', requireAuth, requireHrOrAdmin, (req: Request, res: Response) => {
+  const caller = (req as any).user;
   const { id } = req.params;
   const idx = db.employees.findIndex((e: any) => e.id === id);
   if (idx === -1) return res.status(404).json({ success: false, message: 'پرسنل یافت نشد.' });
 
-  // Field Allowlist (Fixes SEC-008: prevent malicious overwriting of sensitive metadata)
+  const existingEmp = db.employees[idx];
+  const targetUser = db.users.find((u: any) => u.employeeId === id);
+
+  if (targetUser && (targetUser.isSuperAdmin || targetUser.role === 'ADMIN') && !isSuperAdmin(caller)) {
+    return res.status(403).json({ success: false, message: 'شما مجاز به ویرایش پرونده مدیر ارشد نیستید.' });
+  }
+
+  if (caller.employeeId === id && !isSuperAdmin(caller)) {
+    if (req.body.permissions || req.body.managementRoles || req.body.isHrManager || req.body.isFinanceManager || req.body.role) {
+      return res.status(403).json({ success: false, message: 'تغییر سطوح دسترسی و اختیارات خود مجاز نیست.' });
+    }
+  }
+
   const allowedFields = [
     'firstName', 'lastName', 'phone', 'email', 'workshopId', 'shiftId',
     'department', 'position', 'jobTitle', 'jobCategory', 'address', 'birthDate', 'hireDate',
     'baseSalary', 'hourlyRate', 'overtimeRate', 'remainingLeaveDays',
     'cardNumber', 'bankCardNumber', 'bankAccount', 'bankAccountNumber', 'shebaNumber', 'bankShebaNumber',
-    'isConfidential', 'isActive', 'personalCode', 'nationalCode', 'username', 'password',
-    'contractType', 'permissions', 'managementRoles', 'avatarUrl', 'status'
+    'isConfidential', 'isActive', 'personalCode', 'nationalCode', 'username',
+    'contractType', 'avatarUrl', 'status'
   ];
+  if (isSuperAdmin(caller)) {
+    allowedFields.push('permissions', 'managementRoles', 'isHrManager', 'isFinanceManager');
+  }
+
   const updates: any = {};
   for (const field of allowedFields) {
     if (req.body[field] !== undefined) {
       updates[field] = req.body[field];
     }
   }
+  delete updates.password;
 
-  db.employees[idx] = { ...db.employees[idx], ...updates, id };
+  db.employees[idx] = { ...existingEmp, ...updates, id };
 
-  // Sync associated user name, phone, workshop
-  const uIdx = db.users.findIndex((u: any) => u.employeeId === id);
-  if (uIdx !== -1) {
+  if (targetUser) {
     if (updates.firstName || updates.lastName) {
-      db.users[uIdx].name = `${db.employees[idx].firstName} ${db.employees[idx].lastName}`;
+      targetUser.name = `${db.employees[idx].firstName} ${db.employees[idx].lastName}`;
     }
-    if (updates.phone) {
-      db.users[uIdx].phone = updates.phone;
-    }
-    if (updates.workshopId) {
-      db.users[uIdx].workshopId = updates.workshopId;
-    }
-    if (updates.email) {
-      db.users[uIdx].email = updates.email;
+    if (updates.phone) targetUser.phone = updates.phone;
+    if (updates.workshopId) targetUser.workshopId = updates.workshopId;
+    if (updates.email) targetUser.email = updates.email;
+    if (isSuperAdmin(caller)) {
+      if (updates.managementRoles !== undefined) targetUser.managementRoles = updates.managementRoles;
+      if (updates.isHrManager !== undefined) targetUser.isHrManager = updates.isHrManager;
+      if (updates.isFinanceManager !== undefined) targetUser.isFinanceManager = updates.isFinanceManager;
+      if (updates.permissions !== undefined) targetUser.permissions = updates.permissions;
     }
   }
 
-  if (!persistDb()) {
-    return res.status(500).json({ success: false, message: 'خطا در ذخیره‌سازی داده در سرور' });
-  }
+  persistDb();
   res.json({ success: true, employee: db.employees[idx] });
 });
 
-app.delete('/api/employees/:id', requireRole('ADMIN'), (req: Request, res: Response) => {
+app.delete('/api/employees/:id', requireAuth, requireSuperAdmin, (req: Request, res: Response) => {
   const { id } = req.params;
-  // Raw deletion: never deletes admin or other accounts (Fixes DATA-002)
+  const caller = (req as any).user;
+  const targetUser = db.users.find((u: any) => u.employeeId === id);
+
+  if (targetUser && (targetUser.isSuperAdmin || targetUser.id === caller.id)) {
+    return res.status(403).json({ success: false, message: 'حذف حساب مدیر ارشد امکان‌پذیر نیست.' });
+  }
+
   db.employees = db.employees.filter((e: any) => e.id !== id);
   db.users = db.users.filter((u: any) => u.employeeId !== id);
-  if (!persistDb()) {
-    return res.status(500).json({ success: false, message: 'خطا در ذخیره‌سازی داده در سرور' });
-  }
-  res.json({ success: true, message: 'پرسنل با موفقیت حذف شد.' });
+  persistDb();
+  res.json({ success: true, message: 'پرسنل و حساب کاربری مربوطه با موفقیت حذف شد.' });
 });
 
 // 8. Leaves Management with Strict State-Machine & Validation (Fixes HR-001..HR-007)
-app.get('/api/leaves', (req: Request, res: Response) => {
+app.get('/api/leaves', requireAuth, (req: Request, res: Response) => {
   const user = (req as any).user;
+  if (!db.leaves) db.leaves = [];
   if (user && user.role === 'EMPLOYEE' && user.employeeId) {
     return res.json(db.leaves.filter((l: any) => l.employeeId === user.employeeId));
+  }
+  if (isWorkshopSupervisor(user) && !isSuperAdmin(user) && !isHrManager(user)) {
+    const workshopId = user.workshopId;
+    if (workshopId) {
+      const empIds = db.employees.filter((e: any) => e.workshopId === workshopId).map((e: any) => e.id);
+      return res.json(db.leaves.filter((l: any) => empIds.includes(l.employeeId)));
+    }
+  }
+  if (!isHrManager(user) && !isSuperAdmin(user) && !isFinanceManager(user)) {
+    return res.status(403).json({ success: false, message: 'دسترسی غیرمجاز به لیست مرخصی‌ها.' });
   }
   res.json(db.leaves);
 });
 
-app.post('/api/leaves', (req: Request, res: Response) => {
+app.post('/api/leaves', requireAuth, (req: Request, res: Response) => {
   const user = (req as any).user;
   const leave = req.body;
 
@@ -1644,7 +1976,7 @@ app.post('/api/leaves', (req: Request, res: Response) => {
   res.json({ success: true, message: 'درخواست مرخصی با موفقیت ثبت شد و در انتظار تایید است.', leave: newLeave });
 });
 
-app.post('/api/leaves/review', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+app.post('/api/leaves/review', requireSupervisorOrHrOrAdmin, (req: Request, res: Response) => {
   const user = (req as any).user;
   const { leaveId, status, rejectionReason } = req.body;
   const leave = db.leaves.find((l: any) => l.id === leaveId);
@@ -1717,8 +2049,15 @@ app.delete('/api/leaves/:id', requireAuth, (req: Request, res: Response) => {
   const leave = db.leaves.find((l: any) => l.id === id);
   if (!leave) return res.status(404).json({ success: false, message: 'یافت نشد' });
 
-  if (user.role === 'EMPLOYEE' && leave.employeeId !== user.employeeId) {
-    return res.status(403).json({ success: false, message: 'شما مجاز به حذف مرخصی دیگران نیستید.' });
+  if (user.role === 'EMPLOYEE') {
+    if (leave.employeeId !== user.employeeId) {
+      return res.status(403).json({ success: false, message: 'شما مجاز به حذف مرخصی دیگران نیستید.' });
+    }
+    if (leave.status !== 'PENDING') {
+      return res.status(403).json({ success: false, message: 'مرخصی‌های تایید یا رد شده توسط کارمند قابل حذف نیستند. لطفاً با منابع انسانی تماس بگیرید.' });
+    }
+  } else if (!isHrManager(user) && !isSuperAdmin(user)) {
+    return res.status(403).json({ success: false, message: 'دسترسی غیرمجاز برای حذف مرخصی.' });
   }
 
   if (leave.status === 'APPROVED') {
@@ -1741,14 +2080,18 @@ app.delete('/api/leaves/:id', requireAuth, (req: Request, res: Response) => {
   if (!persistDb()) {
     return res.status(500).json({ success: false, message: 'خطا در ذخیره‌سازی داده در سرور' });
   }
-  res.json({ success: true, message: 'درخواست مرخصی حذف و سهمیه و رکوردهای مربوطه بازیابی شدند.' });
+  res.json({ success: true, message: 'درخواست مرخصی با موفقیت حذف شد.' });
 });
 
 // 9. Advance Requests with Strict State-Machine (Fixes ADV-001 & ADV-002)
-app.get('/api/advances', (req: Request, res: Response) => {
+app.get('/api/advances', requireAuth, (req: Request, res: Response) => {
   const user = (req as any).user;
+  if (!db.advances) db.advances = [];
   if (user && user.role === 'EMPLOYEE' && user.employeeId) {
     return res.json(db.advances.filter((a: any) => a.employeeId === user.employeeId));
+  }
+  if (!isFinanceManager(user)) {
+    return res.status(403).json({ success: false, message: 'مشاهده درخواست‌های مساعده فقط برای مدیر مالی و مدیر ارشد مجاز است.' });
   }
   res.json(db.advances);
 });
@@ -1808,7 +2151,7 @@ app.post('/api/advances', (req: Request, res: Response) => {
   res.json({ success: true, message: 'درخواست مساعده با موفقیت ارسال شد.', advance: newAdv });
 });
 
-app.post('/api/advances/review', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+app.post('/api/advances/review', requireFinanceOrAdmin, (req: Request, res: Response) => {
   const user = (req as any).user;
   const { advanceId, status } = req.body;
   const adv = db.advances.find((a: any) => a.id === advanceId);
@@ -1830,11 +2173,14 @@ app.post('/api/advances/review', requireRole('ADMIN', 'MANAGER'), (req: Request,
 });
 
 // 9.5 Worker Personal Card Expenses (خریدهای کارگران با کارت شخصی - بستانکاری کارگر بابت هزینه مجموعه)
-app.get('/api/expenses', (req: Request, res: Response) => {
+app.get('/api/expenses', requireAuth, (req: Request, res: Response) => {
   const user = (req as any).user;
   if (!db.expenses) db.expenses = [];
   if (user && user.role === 'EMPLOYEE' && user.employeeId) {
     return res.json(db.expenses.filter((e: any) => e.employeeId === user.employeeId));
+  }
+  if (!isFinanceManager(user)) {
+    return res.status(403).json({ success: false, message: 'مشاهده هزینه‌ها فقط برای مدیر مالی و مدیر ارشد مجاز است.' });
   }
   res.json(db.expenses);
 });
@@ -1911,7 +2257,7 @@ app.post('/api/expenses', (req: Request, res: Response) => {
 });
 
 // تصمیم‌گیری مدیر در مورد هزینه: تسویه الآن | افزودن به حقوق | رد
-app.post('/api/expenses/review', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+app.post('/api/expenses/review', requireFinanceOrAdmin, (req: Request, res: Response) => {
   const user = (req as any).user;
   const { expenseId, action, notes } = req.body;
 
@@ -1979,7 +2325,7 @@ app.post('/api/expenses/review', requireRole('ADMIN', 'MANAGER'), (req: Request,
   });
 });
 
-app.post('/api/expenses/settle', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+app.post('/api/expenses/settle', requireFinanceOrAdmin, (req: Request, res: Response) => {
   const user = (req as any).user;
   const { expenseId, notes } = req.body;
 
@@ -2015,16 +2361,19 @@ app.post('/api/expenses/settle', requireRole('ADMIN', 'MANAGER'), (req: Request,
 });
 
 // 9.6 Miscellaneous Payments by Manager to Worker (پرداخت‌های متفرقه، علی‌الحساب و سایر)
-app.get('/api/misc-payments', (req: Request, res: Response) => {
+app.get('/api/misc-payments', requireAuth, (req: Request, res: Response) => {
   const user = (req as any).user;
   if (!db.miscPayments) db.miscPayments = [];
   if (user && user.role === 'EMPLOYEE' && user.employeeId) {
     return res.json(db.miscPayments.filter((p: any) => p.employeeId === user.employeeId));
   }
+  if (!isFinanceManager(user)) {
+    return res.status(403).json({ success: false, message: 'مشاهده پرداخت‌های متفرقه فقط برای امور مالی مجاز است.' });
+  }
   res.json(db.miscPayments);
 });
 
-app.post('/api/misc-payments', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+app.post('/api/misc-payments', requireFinanceOrAdmin, (req: Request, res: Response) => {
   const user = (req as any).user;
   const { employeeId, amount, title, date, time, month, deductFromSalary, notes } = req.body;
 
@@ -2072,7 +2421,7 @@ app.post('/api/misc-payments', requireRole('ADMIN', 'MANAGER'), (req: Request, r
   res.json({ success: true, message: 'پرداخت با موفقیت ثبت شد.', payment: newPayment });
 });
 
-app.delete('/api/misc-payments/:id', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+app.delete('/api/misc-payments/:id', requireFinanceOrAdmin, (req: Request, res: Response) => {
   const { id } = req.params;
   if (!db.miscPayments) db.miscPayments = [];
   db.miscPayments = db.miscPayments.filter((p: any) => p.id !== id);
@@ -2081,11 +2430,14 @@ app.delete('/api/misc-payments/:id', requireRole('ADMIN', 'MANAGER'), (req: Requ
 });
 
 // 9.7 Work Missions (مأموریت‌های کاری - ثبت دقیق و تشخیص ساعات کاری)
-app.get('/api/missions', (req: Request, res: Response) => {
+app.get('/api/missions', requireAuth, (req: Request, res: Response) => {
   const user = (req as any).user;
   if (!db.missions) db.missions = [];
   if (user && user.role === 'EMPLOYEE' && user.employeeId) {
     return res.json(db.missions.filter((m: any) => m.employeeId === user.employeeId));
+  }
+  if (!isHrManager(user) && !isWorkshopSupervisor(user)) {
+    return res.status(403).json({ success: false, message: 'دسترسی مشاهده مأموریت‌ها برای این نقش مجاز نیست.' });
   }
   res.json(db.missions);
 });
@@ -2153,20 +2505,34 @@ app.post('/api/missions', (req: Request, res: Response) => {
   res.json({ success: true, message: 'مأموریت کاری با موفقیت ثبت شد.', mission: newMission });
 });
 
-app.delete('/api/missions/:id', (req: Request, res: Response) => {
+app.delete('/api/missions/:id', requireAuth, (req: Request, res: Response) => {
+  const user = (req as any).user;
   const { id } = req.params;
   if (!db.missions) db.missions = [];
+  const target = db.missions.find((m: any) => m.id === id);
+  if (!target) return res.status(404).json({ success: false, message: 'مأموریت کاری یافت نشد.' });
+
+  if (user.role === 'EMPLOYEE' && target.employeeId !== user.employeeId) {
+    return res.status(403).json({ success: false, message: 'شما مجاز به حذف مأموریت دیگران نیستید.' });
+  }
+  if (!isHrManager(user) && !isWorkshopSupervisor(user) && target.employeeId !== user.employeeId) {
+    return res.status(403).json({ success: false, message: 'شما دسترسی حذف این مأموریت را ندارید.' });
+  }
+
   db.missions = db.missions.filter((m: any) => m.id !== id);
   persistDb();
   res.json({ success: true, message: 'مأموریت کاری با موفقیت حذف شد.' });
 });
 
 // 12.5. Homework & Piecework Tasks (کار در منزل و کارمزدی)
-app.get('/api/homework-tasks', (req: Request, res: Response) => {
+app.get('/api/homework-tasks', requireAuth, (req: Request, res: Response) => {
   const user = (req as any).user;
   if (!db.homeworkTasks) db.homeworkTasks = [];
   if (user && user.role === 'EMPLOYEE' && user.employeeId) {
     return res.json(db.homeworkTasks.filter((t: any) => t.employeeId === user.employeeId));
+  }
+  if (!isHrManager(user) && !isFinanceManager(user) && !isWorkshopSupervisor(user)) {
+    return res.status(403).json({ success: false, message: 'دسترسی به گزارشات کار در منزل مجاز نیست.' });
   }
   res.json(db.homeworkTasks);
 });
@@ -2219,8 +2585,11 @@ app.post('/api/homework-tasks', requireAuth, (req: Request, res: Response) => {
   res.json({ success: true, message: 'گزارش کار در منزل با موفقیت ثبت شد.', task: newTask });
 });
 
-app.post('/api/homework-tasks/review', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+app.post('/api/homework-tasks/review', requireAuth, (req: Request, res: Response) => {
   const reviewer = (req as any).user;
+  if (!isFinanceManager(reviewer) && !isHrManager(reviewer)) {
+    return res.status(403).json({ success: false, message: 'دسترسی تعیین تکلیف کار در منزل برای این نقش مجاز نیست.' });
+  }
   const { id, action, notes } = req.body;
   if (!db.homeworkTasks) db.homeworkTasks = [];
   const target = db.homeworkTasks.find((t: any) => t.id === id);
@@ -2255,24 +2624,38 @@ app.post('/api/homework-tasks/review', requireRole('ADMIN', 'MANAGER'), (req: Re
   res.json({ success: true, message: 'تغییر وضعیت با موفقیت انجام شد.', task: target });
 });
 
-app.delete('/api/homework-tasks/:id', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+app.delete('/api/homework-tasks/:id', requireAuth, (req: Request, res: Response) => {
   const { id } = req.params;
+  const user = (req as any).user;
   if (!db.homeworkTasks) db.homeworkTasks = [];
+  const target = db.homeworkTasks.find((t: any) => t.id === id);
+  if (!target) return res.status(404).json({ success: false, message: 'مورد کار در منزل یافت نشد.' });
+
+  if (user.role === 'EMPLOYEE' && target.employeeId !== user.employeeId) {
+    return res.status(403).json({ success: false, message: 'شما مجاز به حذف کار در منزل دیگران نیستید.' });
+  }
+  if (!isFinanceManager(user) && !isHrManager(user) && target.employeeId !== user.employeeId) {
+    return res.status(403).json({ success: false, message: 'دسترسی غیرمجاز برای حذف.' });
+  }
+
   db.homeworkTasks = db.homeworkTasks.filter((t: any) => t.id !== id);
   persistDb();
   res.json({ success: true, message: 'مورد کار در منزل با موفقیت حذف شد.' });
 });
 
 // Bonuses and Penalties endpoint
-app.get('/api/bonuses', (req: Request, res: Response) => {
+app.get('/api/bonuses', requireAuth, (req: Request, res: Response) => {
   const user = (req as any).user;
   if (user && user.role === 'EMPLOYEE' && user.employeeId) {
     return res.json((db.bonusesPenalties || []).filter((b: any) => b.employeeId === user.employeeId));
   }
+  if (!isFinanceManager(user) && !isHrManager(user)) {
+    return res.status(403).json({ success: false, message: 'دسترسی به لیست پاداش و جریمه‌ها مجاز نیست.' });
+  }
   res.json(db.bonusesPenalties || []);
 });
 
-app.post('/api/bonuses', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+app.post('/api/bonuses', requireFinanceOrAdmin, (req: Request, res: Response) => {
   const user = (req as any).user;
   const bp = req.body;
   if (!bp.employeeId || !bp.amount || !bp.type || !bp.title) {
@@ -2300,7 +2683,7 @@ app.post('/api/bonuses', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Re
   res.json({ success: true, bonusPenalty: newBp });
 });
 
-app.delete('/api/bonuses/:id', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+app.delete('/api/bonuses/:id', requireFinanceOrAdmin, (req: Request, res: Response) => {
   const { id } = req.params;
   if (!db.bonusesPenalties) {
     db.bonusesPenalties = [];
@@ -2317,15 +2700,19 @@ app.delete('/api/bonuses/:id', requireRole('ADMIN', 'MANAGER'), (req: Request, r
 });
 
 // 10. Payroll & Salary Slips with Immutable Paid Records (Fixes PAY-001..PAY-006)
-app.get('/api/salaries', (req: Request, res: Response) => {
+app.get('/api/salaries', requireAuth, (req: Request, res: Response) => {
   const user = (req as any).user;
+  if (!db.salaries) db.salaries = [];
   if (user && user.role === 'EMPLOYEE' && user.employeeId) {
     return res.json(db.salaries.filter((s: any) => s.employeeId === user.employeeId));
+  }
+  if (!isFinanceManager(user)) {
+    return res.status(403).json({ success: false, message: 'مشاهده لیست حقوق و دستمزد صرفاً برای امور مالی و مدیر ارشد مجاز است.' });
   }
   res.json(db.salaries);
 });
 
-app.post('/api/salaries/calculate', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+app.post('/api/salaries/calculate', requireFinanceOrAdmin, (req: Request, res: Response) => {
   const { employeeId, month } = req.body;
   const emp = db.employees.find(e => e.id === employeeId);
   if (!emp) {
@@ -2379,7 +2766,7 @@ app.post('/api/salaries/calculate', requireRole('ADMIN', 'MANAGER'), (req: Reque
   res.json({ success: true, salary: newSlip });
 });
 
-app.post('/api/salaries/mark-paid', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+app.post('/api/salaries/mark-paid', requireFinanceOrAdmin, (req: Request, res: Response) => {
   const { salaryId, paymentDate } = req.body;
   const slip = db.salaries.find((s: any) => s.id === salaryId);
   if (!slip) return res.status(404).json({ success: false, message: 'فیش حقوقی یافت نشد.' });
@@ -2417,11 +2804,33 @@ export function sanitizeSettingsForClient(settings: any) {
   return clone;
 }
 
-app.get('/api/settings', (_req: Request, res: Response) => {
-  res.json(sanitizeSettingsForClient(db.settings));
+app.get('/api/settings/public', (_req: Request, res: Response) => {
+  res.json({
+    companyName: db.settings?.companyName || 'M.GAMMON',
+    companyCode: db.settings?.companyCode || 'MG-101',
+    logoUrl: db.settings?.logoUrl || '',
+    dashboardBannerUrl: db.settings?.dashboardBannerUrl || ''
+  });
 });
 
-app.put('/api/settings', requireRole('ADMIN'), (req: Request, res: Response) => {
+app.get('/api/settings', requireAuth, (req: Request, res: Response) => {
+  const user = (req as any).user;
+  const raw = db.settings || {};
+  const sanitized = sanitizeSettingsForClient(raw);
+
+  if (!isSuperAdmin(user)) {
+    delete sanitized.smsUsername;
+    delete sanitized.smsPassword;
+    delete sanitized.smsApiKey;
+    delete sanitized.smsNewApiToken;
+    delete sanitized.smsCustomEndpoint;
+    delete sanitized.smsSenderNumber;
+  }
+
+  res.json(sanitized);
+});
+
+app.put('/api/settings', requireSuperAdmin, (req: Request, res: Response) => {
   const incoming = req.body || {};
   const current = db.settings || {};
 
@@ -2604,7 +3013,14 @@ app.get('/api/work-reports', requireAuth, (req: Request, res: Response) => {
 
 app.post('/api/work-reports', requireAuth, (req: Request, res: Response) => {
   const user = (req as any).user;
-  const { employeeId, title, content, date, hoursSpent, tags } = req.body;
+  let { employeeId, title, content, date, hoursSpent, tags } = req.body;
+  if (user?.role === 'EMPLOYEE') {
+    if (!user.employeeId) {
+      return res.status(403).json({ success: false, message: 'حساب کاربری شما به پرونده پرسنلی متصل نیست.' });
+    }
+    employeeId = user.employeeId;
+  }
+
   if (!employeeId || !title || !content) {
     return res.status(400).json({ success: false, message: 'شناسه کارمند، عنوان و شرح گزارش الزامی است.' });
   }
@@ -2642,7 +3058,7 @@ app.post('/api/work-reports', requireAuth, (req: Request, res: Response) => {
   res.json({ success: true, report: newReport });
 });
 
-app.put('/api/work-reports/:id/feedback', requireRole('ADMIN', 'MANAGER'), (req: Request, res: Response) => {
+app.put('/api/work-reports/:id/feedback', requireSupervisorOrHrOrAdmin, (req: Request, res: Response) => {
   const { id } = req.params;
   const { feedback, reviewerName } = req.body;
   const user = (req as any).user;
@@ -3777,12 +4193,14 @@ app.post('/api/messages', requireRole('ADMIN', 'MANAGER'), async (req: Request, 
 // ============================================================================
 
 // Web Push Registration Endpoints (PWA Background Notifications)
-app.get('/api/push/public-key', (req: Request, res: Response) => {
+app.get('/api/push/public-key', requireAuth, (req: Request, res: Response) => {
   res.json({ publicKey: vapidKeys.publicKey });
 });
 
-app.post('/api/push/subscribe', (req: Request, res: Response) => {
-  const { subscription, employeeId } = req.body;
+app.post('/api/push/subscribe', requireAuth, (req: Request, res: Response) => {
+  const user = (req as any).user;
+  const { subscription } = req.body;
+  const employeeId = user?.role === 'EMPLOYEE' ? user.employeeId : (req.body.employeeId || user?.employeeId);
   if (!subscription || !subscription.endpoint) {
     return res.status(400).json({ success: false, message: 'اطلاعات اشتراک نامعتبر است' });
   }
@@ -3800,19 +4218,17 @@ app.post('/api/push/subscribe', (req: Request, res: Response) => {
 });
 
 // Get alarms (All for ADMIN/MANAGER, Targeted/Active for Employee)
-app.get('/api/alarms', (req: Request, res: Response) => {
-  const token = (req.headers.authorization || '').replace('Bearer ', '').trim();
-  const session = token ? db.sessions[token] : null;
-  const user = session ? db.users.find((u: any) => u.id === session.userId) : null;
+app.get('/api/alarms', requireAuth, (req: Request, res: Response) => {
+  const user = (req as any).user;
   const alarms = Array.isArray(db.alarms) ? db.alarms : [];
 
   if (user && (user.role === 'ADMIN' || user.role === 'MANAGER')) {
     return res.json(alarms);
   }
 
-  const employeeId = (req.query.employeeId as string) || (user?.employeeId as string);
+  const employeeId = user?.employeeId;
   const emp = employeeId ? db.employees.find((e: any) => e.id === employeeId) : null;
-  const empWorkshopId = emp?.workshopId || (req.query.workshopId as string);
+  const empWorkshopId = emp?.workshopId;
 
   const activeAlarms = alarms.filter((a: any) => {
     if (!a.isActive) return false;
@@ -3959,9 +4375,11 @@ app.post('/api/alarms/:id/trigger', requireRole('ADMIN', 'MANAGER'), async (req:
 });
 
 // Employee acknowledges and dismisses alarm
-app.post('/api/alarms/:id/acknowledge', (req: Request, res: Response) => {
+app.post('/api/alarms/:id/acknowledge', requireAuth, (req: Request, res: Response) => {
+  const user = (req as any).user;
   const { id } = req.params;
-  const { employeeId, employeeName } = req.body;
+  const employeeId = user?.role === 'EMPLOYEE' ? user.employeeId : (req.body.employeeId || user?.employeeId);
+  const employeeName = user?.name || req.body.employeeName;
   const alarm = (db.alarms || []).find((a: any) => a.id === id);
   if (!alarm) {
     return res.status(404).json({ success: false, message: 'آلارم یافت نشد.' });
