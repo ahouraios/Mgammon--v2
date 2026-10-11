@@ -377,6 +377,27 @@ export class StorageService {
           localStorage.removeItem(STORAGE_KEYS.REMEMBER_ME);
         }
 
+        if (data.employee) {
+          const emps = getItem<Employee[]>(STORAGE_KEYS.EMPLOYEES, initialEmployees);
+          const existingEmpIdx = emps.findIndex(e => e.id === data.employee.id);
+          if (existingEmpIdx !== -1) {
+            emps[existingEmpIdx] = { ...emps[existingEmpIdx], ...data.employee };
+          } else {
+            emps.push(data.employee);
+          }
+          setItem(STORAGE_KEYS.EMPLOYEES, emps);
+        }
+
+        // Also ensure user is preserved in raw users list
+        const rawUsers = getItem<User[]>(STORAGE_KEYS.USERS, initialUsers);
+        const uIdx = rawUsers.findIndex(u => u.id === data.user.id || u.username === data.user.username);
+        if (uIdx !== -1) {
+          rawUsers[uIdx] = { ...rawUsers[uIdx], ...data.user };
+        } else {
+          rawUsers.push(data.user);
+        }
+        setItem(STORAGE_KEYS.USERS, rawUsers);
+
         this.saveRememberedUser({
           id: data.user.id,
           name: data.user.name,
@@ -944,6 +965,59 @@ export class StorageService {
 
   static getAllEmployeesRaw(): Employee[] {
     const emps = getItem<Employee[]>(STORAGE_KEYS.EMPLOYEES, initialEmployees);
+    const users = getItem<User[]>(STORAGE_KEYS.USERS, initialUsers);
+    let changed = false;
+
+    // Guarantee that any user with an employeeId has a matching employee record
+    for (const u of users) {
+      if (u.employeeId && u.id !== 'usr_admin') {
+        const found = emps.find(e => e.id === u.employeeId);
+        if (!found) {
+          const nameParts = (u.name || '').trim().split(' ');
+          const synthesized: Employee = {
+            id: u.employeeId,
+            companyId: u.companyId || 'comp_mgommon_01',
+            personalCode: u.employeeId.replace(/^emp_/, '').slice(-4) || '1001',
+            nationalCode: '0920000000',
+            firstName: nameParts[0] || u.username || 'پرسنل',
+            lastName: nameParts.slice(1).join(' ') || '',
+            phone: u.phone || '09154520433',
+            email: u.email || `${u.username}@mgommon.ir`,
+            department: (u.isHrManager || u.isFinanceManager) ? 'مدیریت و منابع انسانی' : 'کارگاه',
+            position: u.isHrManager ? 'مدیر منابع انسانی' : u.isFinanceManager ? 'مدیر مالی' : 'نیروی کارگاهی',
+            workshopId: u.workshopId || 'ws_1',
+            username: u.username,
+            password: u.password,
+            hireDate: '1403/01/01',
+            status: 'ACTIVE',
+            contractType: 'PERMANENT',
+            shiftId: 'shift_standard_day',
+            baseSalary: 35000000,
+            hourlyRate: 198000,
+            overtimeRate: 277000,
+            remainingLeaveDays: 26,
+            cardNumber: '6037997100000000',
+            bankAccount: '100000000',
+            shebaNumber: 'IR000000000000000000000000',
+            isConfidential: false,
+            permissions: u.permissions || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            managementRoles: u.managementRoles || [],
+            isHrManager: Boolean(u.isHrManager),
+            isFinanceManager: Boolean(u.isFinanceManager),
+            hasResponsibilityAllowance: Boolean(u.isHrManager || u.isFinanceManager),
+            responsibilityAllowanceType: 'PERCENTAGE',
+            responsibilityAllowanceValue: 15
+          };
+          emps.push(synthesized);
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      setItem(STORAGE_KEYS.EMPLOYEES, emps);
+    }
+
     return emps.map(e => ({
       ...e,
       permissions: e.permissions || [1, 2, 3, 4, 5, 6],

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Clock,
   LogIn,
@@ -99,10 +99,45 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
   const shamsi = getTodayShamsiDetailed();
   const settings = StorageService.getSettings();
   const isEmployeeRole = currentUser.role === 'EMPLOYEE';
-  const currentEmployee =
-    employees.find((e) => e.id === currentUser.employeeId) ||
-    employees.find((e) => e.email === currentUser.email) ||
-    (!isEmployeeRole && employees.length > 0 ? employees[0] : undefined);
+  const currentEmployee: Employee = useMemo(() => {
+    const found =
+      employees.find((e) => e.id === currentUser.employeeId) ||
+      employees.find((e) => e.email === currentUser.email) ||
+      (!isEmployeeRole && employees.length > 0 ? employees[0] : undefined);
+    if (found) return found;
+
+    const nameParts = (currentUser.name || '').trim().split(' ');
+    return {
+      id: currentUser.employeeId || currentUser.id || 'emp_user',
+      companyId: currentUser.companyId || 'comp_mgommon_01',
+      personalCode: currentUser.employeeId?.replace(/^emp_/, '').slice(-4) || '1001',
+      nationalCode: '0920000000',
+      firstName: nameParts[0] || currentUser.username || 'پرسنل',
+      lastName: nameParts.slice(1).join(' ') || '',
+      phone: currentUser.phone || '09154520433',
+      email: currentUser.email || `${currentUser.username}@mgommon.ir`,
+      department: (currentUser.isHrManager || currentUser.isFinanceManager) ? 'مدیریت و منابع انسانی' : 'کارگاه',
+      position: currentUser.isHrManager ? 'مدیر منابع انسانی' : currentUser.isFinanceManager ? 'مدیر مالی' : 'نیروی کارگاهی',
+      workshopId: currentUser.workshopId || 'ws_1',
+      username: currentUser.username,
+      hireDate: '1403/01/01',
+      status: 'ACTIVE',
+      contractType: 'PERMANENT',
+      shiftId: 'shift_standard_day',
+      baseSalary: 35000000,
+      hourlyRate: 198000,
+      overtimeRate: 277000,
+      remainingLeaveDays: 26,
+      cardNumber: '6037997100000000',
+      bankAccount: '100000000',
+      shebaNumber: 'IR000000000000000000000000',
+      isConfidential: false,
+      permissions: currentUser.permissions || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+      managementRoles: currentUser.managementRoles || [],
+      isHrManager: Boolean(currentUser.isHrManager),
+      isFinanceManager: Boolean(currentUser.isFinanceManager),
+    } as Employee;
+  }, [employees, currentUser, isEmployeeRole]);
 
   const shift = StorageService.getShifts().find((s) => s.id === currentEmployee?.shiftId) || StorageService.getShifts()[0];
 
@@ -2738,10 +2773,6 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
               </div>
             </div>
 
-            <p className="text-xs text-slate-500 leading-relaxed bg-teal-50/60 p-3 rounded-2xl border border-teal-100">
-              این گزارش کاملاً اختیاری است و برای ثبت سوابق، پیشرفت تولید و فعالیت‌های روزانه شما در پرونده پرسنلی ذخیره می‌شود تا مدیر ارشد و مدیر منابع انسانی در جریان عملکرد شما قرار گیرند.
-            </p>
-
             {reportMsg && (
               <div
                 className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
@@ -2766,6 +2797,7 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
                 setIsSubmittingReport(true);
                 const res = StorageService.submitWorkReport({
                   employeeId: currentEmployee.id,
+                  employeeName: `${currentEmployee.firstName} ${currentEmployee.lastName}`.trim() || currentUser.name,
                   title: reportTitle.trim(),
                   content: reportContent.trim(),
                   date: reportDate,

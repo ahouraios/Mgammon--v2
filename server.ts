@@ -397,6 +397,51 @@ let db: DatabaseSchema = (() => {
       if (merged.settings && !merged.settings.smsConnectionMode) {
         merged.settings.smsConnectionMode = 'legacy_rest';
       }
+      // Guarantee all users with employeeId exist in db.employees
+      if (Array.isArray(merged.users) && Array.isArray(merged.employees)) {
+        for (const u of merged.users) {
+          if (u.employeeId && u.id !== 'usr_admin') {
+            const hasEmp = merged.employees.some((e: any) => e.id === u.employeeId);
+            if (!hasEmp) {
+              const nameParts = (u.name || '').trim().split(' ');
+              merged.employees.push({
+                id: u.employeeId,
+                companyId: u.companyId || 'comp_mgommon_01',
+                personalCode: u.employeeId.replace(/^emp_/, '').slice(-4) || '1001',
+                nationalCode: '0920000000',
+                firstName: nameParts[0] || u.username || 'پرسنل',
+                lastName: nameParts.slice(1).join(' ') || '',
+                phone: u.phone || '09154520433',
+                email: u.email || `${u.username}@mgommon.ir`,
+                department: (u.isHrManager || u.isFinanceManager) ? 'مدیریت و منابع انسانی' : 'کارگاه',
+                position: u.isHrManager ? 'مدیر منابع انسانی' : u.isFinanceManager ? 'مدیر مالی' : 'نیروی کارگاهی',
+                workshopId: u.workshopId || 'ws_1',
+                username: u.username,
+                password: u.password,
+                hireDate: '1403/01/01',
+                status: 'ACTIVE',
+                contractType: 'PERMANENT',
+                shiftId: 'shift_standard_day',
+                baseSalary: 35000000,
+                hourlyRate: 198000,
+                overtimeRate: 277000,
+                remainingLeaveDays: 26,
+                cardNumber: '6037997100000000',
+                bankAccount: '100000000',
+                shebaNumber: 'IR000000000000000000000000',
+                isConfidential: false,
+                permissions: u.permissions || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                managementRoles: u.managementRoles || [],
+                isHrManager: Boolean(u.isHrManager),
+                isFinanceManager: Boolean(u.isFinanceManager),
+                hasResponsibilityAllowance: Boolean(u.isHrManager || u.isFinanceManager),
+                responsibilityAllowanceType: 'PERCENTAGE',
+                responsibilityAllowanceValue: 15
+              });
+            }
+          }
+        }
+      }
       return merged;
     } catch (e) {
       console.error('Failed to parse db.json, initializing fresh store:', e);
@@ -729,12 +774,14 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
 
   // Return sanitized user without passwordHash
   const { passwordHash: _, ...sanitizedUser } = targetUser;
+  const employee = targetUser.employeeId ? db.employees.find(e => e.id === targetUser.employeeId) : undefined;
   logServerAudit(targetUser.id, targetUser.name, 'ورود به سامانه', 'احراز هویت', `ورود موفق از طریق نام کاربری: ${targetUser.username}`, clientIp);
 
   res.json({
     success: true,
     token,
-    user: sanitizedUser
+    user: sanitizedUser,
+    employee
   });
 });
 

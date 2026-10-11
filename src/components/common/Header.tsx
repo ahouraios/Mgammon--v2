@@ -244,10 +244,10 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 lg:px-8 py-3.5 transition-all w-full max-w-full">
-        <div className="flex items-center justify-between gap-4">
-          {/* Left Side: Company name & live date */}
-          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/70 px-4 lg:px-8 py-2.5 transition-all w-full max-w-full shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+        <div className="flex items-center justify-between gap-3">
+          {/* Left Side: Brand Logo and Company Info */}
+          <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
             {onToggleMobileMenu && (
               <button
                 onClick={onToggleMobileMenu}
@@ -257,51 +257,51 @@ export const Header: React.FC<HeaderProps> = ({
                 <Menu className="w-5 h-5" />
               </button>
             )}
-            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0">
               {settings.logoUrl ? (
                 <img
                   src={settings.logoUrl}
                   alt={settings.companyName || 'M.GAMMON'}
-                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-contain border border-slate-200/80 shadow-xs shrink-0 bg-white p-0.5"
+                  className="w-9 h-9 rounded-xl object-contain border border-slate-200/80 shadow-2xs shrink-0 bg-white p-0.5"
                 />
               ) : (
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-xs shrink-0">
-                  <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-400" />
+                <div className="w-9 h-9 rounded-xl bg-slate-950 text-white flex items-center justify-center font-bold text-sm tracking-wider shadow-xs shrink-0 border border-slate-800">
+                  <span className="text-amber-400 font-mono">M</span>G
                 </div>
               )}
               <div className="min-w-0">
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <h1 className="font-bold text-slate-900 text-sm sm:text-base lg:text-lg tracking-tight truncate max-w-[150px] sm:max-w-none">
+                <div className="flex items-center gap-1.5">
+                  <h1 className="font-extrabold text-slate-900 text-sm sm:text-base tracking-tight truncate max-w-[140px] sm:max-w-none">
                     M.GAMMON
                   </h1>
-                  <span className="hidden sm:inline-block text-[11px] font-mono font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200 shrink-0">
+                  <span className="hidden sm:inline-block text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600 border border-slate-200/80 shrink-0">
                     {settings.companyCode || 'MG-101'}
                   </span>
                 </div>
-                <p className="text-[11px] sm:text-xs text-slate-400 font-normal hidden sm:block truncate">
+                <p className="text-[10px] text-slate-400 font-medium hidden sm:block truncate">
                   مشهد، توس ۱۴۲، حسین زاده ۸
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Center / Shamsi Date and Live Clock */}
-          <div className="hidden md:flex items-center gap-4 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200/60 text-xs text-slate-600 shrink-0">
+          {/* Center: Live Shamsi Date & Precision Clock */}
+          <div className="hidden md:flex items-center gap-3 bg-slate-50/80 px-3.5 py-1.5 rounded-full border border-slate-200/60 text-xs text-slate-600 shrink-0">
             <div className="flex items-center gap-1.5 font-medium">
-              <Calendar className="w-4 h-4 text-slate-400" />
+              <Calendar className="w-3.5 h-3.5 text-slate-400" />
               <span>
-                {shamsi.dayOfWeek} {shamsi.day} {shamsi.monthName} {shamsi.year}
+                {shamsi.dayOfWeek}، {shamsi.day} {shamsi.monthName}
               </span>
             </div>
             <span className="w-1 h-1 rounded-full bg-slate-300" />
-            <div className="flex items-center gap-1.5 font-mono font-semibold text-slate-700">
-              <Clock className="w-3.5 h-3.5 text-indigo-500" />
+            <div className="flex items-center gap-1.5 font-mono font-bold text-slate-800">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <span>{timeStr}</span>
             </div>
           </div>
 
-          {/* Right Side: Alerts, Reset, User Switcher / Login */}
-          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          {/* Right Side: Quick Actions, Alerts, User Profile */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Quick Miscellaneous Payment Button (Admin, Finance, HR) */}
             {(currentUser.role === 'ADMIN' ||
               currentUser.isSuperAdmin ||
@@ -313,11 +313,11 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   type="button"
                   onClick={onOpenQuickMiscPayment}
-                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-xs font-bold transition-all shadow-xs hover:shadow-md cursor-pointer shrink-0"
-                  title="ثبت سریع واریزی متفرقه به پرسنل (خارج از مساعده و تنخواه)"
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer shrink-0"
+                  title="ثبت سریع واریزی متفرقه به پرسنل"
                 >
-                  <Banknote className="w-3.5 h-3.5" />
-                  <span>واریزی متفرقه</span>
+                  <Banknote className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>واریز متفرقه</span>
                 </button>
               )}
 
@@ -326,8 +326,8 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={onNavigateToWorkReports}
-                className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200/90 text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0"
-                title="مشاهده و ثبت گزارش‌های کار روزانه کارگاه"
+                className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100 text-xs font-semibold transition-all cursor-pointer shrink-0"
+                title="مشاهده و ثبت گزارش‌های کار روزانه"
               >
                 <ClipboardList className="w-3.5 h-3.5 text-teal-600" />
                 <span>گزارش‌های کار</span>
@@ -339,7 +339,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={onQuickClockIn}
-                className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-slate-700 hover:text-indigo-700 text-[11px] font-bold transition-all cursor-pointer shrink-0"
+                className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-[11px] font-bold transition-all cursor-pointer shrink-0"
                 title="ثبت سریع تردد ورود/خروج من به عنوان مدیر"
               >
                 <Clock className="w-3 h-3 text-indigo-600" />
@@ -353,20 +353,20 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Pending Alerts / Notifications */}
             <button
               onClick={onNavigateToRequests}
-              className="relative p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              className="relative p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
               title="درخواست‌های در انتظار بررسی"
             >
               <Bell className="w-4 h-4" />
               {pendingRequestsCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 bg-rose-500 text-white text-[9px] font-mono font-bold rounded-full flex items-center justify-center animate-pulse">
                   {pendingRequestsCount}
                 </span>
               )}
             </button>
 
-            <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block" />
+            <div className="h-5 w-px bg-slate-200 mx-0.5 hidden sm:block" />
 
-            {/* Switch User / Role Dropdown */}
+            {/* User Dropdown */}
             <div className="relative" ref={userMenuRef}>
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}

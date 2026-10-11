@@ -120,7 +120,60 @@
       "earlyExitToleranceMinutes": 10
     }
   ],
-  "employees": [],
+  "employees": [
+    {
+      "id": "emp_1790780657070",
+      "companyId": "comp_mgommon_01",
+      "personalCode": "7070",
+      "nationalCode": "0920000000",
+      "firstName": "امید",
+      "lastName": "میثمی",
+      "phone": "09154520433",
+      "email": "omid@mgommon.ir",
+      "department": "مدیریت و منابع انسانی",
+      "position": "مدیر منابع انسانی",
+      "workshopId": "ws_1",
+      "username": "omid",
+      "password": "182030",
+      "hireDate": "1403/01/01",
+      "status": "ACTIVE",
+      "contractType": "PERMANENT",
+      "shiftId": "shift_standard_day",
+      "baseSalary": 35000000,
+      "hourlyRate": 198000,
+      "overtimeRate": 277000,
+      "remainingLeaveDays": 26,
+      "cardNumber": "6037997100000000",
+      "bankAccount": "100000000",
+      "shebaNumber": "IR000000000000000000000000",
+      "isConfidential": false,
+      "permissions": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "managementRoles": [
+        "WORKSHOP_MESSENGER",
+        "WORKSHOP_SUPERVISOR",
+        "LEAVE_ADVANCE_OFFICER",
+        "FINANCE_OFFICER",
+        "REPORTS_ANALYST",
+        "HR_ADMIN"
+      ],
+      "isHrManager": true,
+      "isFinanceManager": true,
+      "hasResponsibilityAllowance": true,
+      "responsibilityAllowanceType": "PERCENTAGE",
+      "responsibilityAllowanceValue": 15
+    }
+  ],
   "users": [
     {
       "id": "usr_admin",
@@ -134,6 +187,43 @@
       "isSuperAdmin": true,
       "workshopId": "ws_1",
       "passwordSalt": "ae252b84bbee211e0f6dc40384e98b97"
+    },
+    {
+      "id": "usr_emp_1790780657070",
+      "companyId": "comp_mgommon_01",
+      "employeeId": "emp_1790780657070",
+      "username": "omid",
+      "password": "182030",
+      "name": "امید میثمی",
+      "email": "omid@mgommon.ir",
+      "phone": "09154520433",
+      "role": "MANAGER",
+      "permissions": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "workshopId": "ws_1",
+      "avatarUrl": "",
+      "managementRoles": [
+        "WORKSHOP_MESSENGER",
+        "WORKSHOP_SUPERVISOR",
+        "LEAVE_ADVANCE_OFFICER",
+        "FINANCE_OFFICER",
+        "REPORTS_ANALYST",
+        "HR_ADMIN"
+      ],
+      "isHrManager": true,
+      "isFinanceManager": true,
+      "passwordHash": "2c9252a280397f31cec663d2202eda5db0daa36c0e0989c782a56d1b37c5b18f",
+      "passwordSalt": "bfeb8c81b6e499f3bfe39919c1194d18"
     }
   ],
   "attendance": [],
@@ -160,7 +250,136 @@
       "createdByName": "مجید نورایی (مالک و مدیر ارشد)"
     }
   ],
+  "homeworkTasks": [],
+  "calendarEvents": [],
+  "workReports": [
+    {
+      "id": "wr_1791657918735_l9fy",
+      "companyId": "comp_mgommon_01",
+      "employeeId": "emp_1790780657070",
+      "employeeName": "امید میثمی",
+      "date": "1405/07/18",
+      "title": "خرید قطعات چوب و‌لوله کشی آب",
+      "content": "خرید چوب و تیغ اور فرز از سه‌راه کاشانی و فدک\nلوله کشی آب سرویس بهداشتی کارگاه",
+      "hoursSpent": 8,
+      "tags": [
+        "سایر فعالیت‌ها"
+      ],
+      "status": "SUBMITTED",
+      "createdAt": "2026-10-10T18:45:18.735Z"
+    }
+  ],
   "auditLogs": [
+    {
+      "id": "log_1791662464104_xtbc",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_emp_1790780657070",
+      "userName": "امید میثمی",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: omid",
+      "timestamp": "2026-10-10T20:01:04.104Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791662225418_g7s3",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_emp_1790780657070",
+      "userName": "امید میثمی",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: omid",
+      "timestamp": "2026-10-10T19:57:05.418Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791657950010_tdqk",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_admin",
+      "userName": "مجید نورایی (مالک و مدیر ارشد)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: admin",
+      "timestamp": "2026-10-10T18:45:50.010Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791657918736_1yih",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_emp_1790780657070",
+      "userName": "امید میثمی",
+      "action": "ثبت گزارش کاری",
+      "resource": "گزارش‌های کاری پرسنل",
+      "details": "ثبت گزارش \"خرید قطعات چوب و‌لوله کشی آب\" برای تاریخ 1405/07/18",
+      "timestamp": "2026-10-10T18:45:18.736Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791656999160_k7ln",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_emp_1790780657070",
+      "userName": "امید میثمی",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: omid",
+      "timestamp": "2026-10-10T18:29:59.160Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791656995370_9q6c",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_emp_1790780657070",
+      "userName": "امید میثمی",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: omid",
+      "timestamp": "2026-10-10T18:29:55.370Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791656625624_k1wk",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_emp_1790780657070",
+      "userName": "امید میثمی",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: omid",
+      "timestamp": "2026-10-10T18:23:45.624Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791650733388_gkan",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_admin",
+      "userName": "مجید نورایی (مالک و مدیر ارشد)",
+      "action": "ورود با اثر انگشت",
+      "resource": "احراز هویت",
+      "details": "ورود بیومتریک موفق: admin",
+      "timestamp": "2026-10-10T16:45:33.388Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791650541672_fkox",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_admin",
+      "userName": "مجید نورایی (مالک و مدیر ارشد)",
+      "action": "ورود به سامانه",
+      "resource": "احراز هویت",
+      "details": "ورود موفق از طریق نام کاربری: admin",
+      "timestamp": "2026-10-10T16:42:21.672Z",
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "log_1791650453332_63r8",
+      "companyId": "comp_mgommon_01",
+      "userId": "usr_admin",
+      "userName": "مجید نورایی (مالک و مدیر ارشد)",
+      "action": "ورود با اثر انگشت",
+      "resource": "احراز هویت",
+      "details": "ورود بیومتریک موفق: admin",
+      "timestamp": "2026-10-10T16:40:53.332Z",
+      "ipAddress": "127.0.0.1"
+    },
     {
       "id": "log_1791051192505_12r0",
       "companyId": "comp_mgommon_01",
@@ -432,42 +651,55 @@
       "expiresAt": 1793562279284,
       "rememberMe": true
     },
-    "mg_sess_c10ab7296b93a69e8d0bca0958406cb4b366b9a5473325314485a765d9634177": {
-      "userId": "usr_admin",
-      "createdAt": 1790970841769,
-      "expiresAt": 1791057241769,
+    "mg_sess_4c38d3b06b308f4595c4947f99375170fe1362a07a153de15473c8ecb82eb197": {
+      "userId": "usr_emp_1790780657070",
+      "createdAt": 1791656625623,
+      "expiresAt": 1791743025623,
       "rememberMe": false
     },
-    "mg_sess_da41739dc295ccdb12db5580222fef4ef09f69ede903fbf199a654bea4043736": {
-      "userId": "usr_admin",
-      "createdAt": 1790972636873,
-      "expiresAt": 1791059036873,
+    "mg_sess_90cf19ab53a8849e2023be19bb625c71d950eb838c25e35038ca7c3ea5da9a0b": {
+      "userId": "usr_emp_1790780657070",
+      "createdAt": 1791656995370,
+      "expiresAt": 1791743395370,
       "rememberMe": false
     },
-    "mg_sess_e101c16af587cb466ca28f6474d4175e81b2b334d722a0ea4ce3afba0fb3e3e7": {
+    "mg_sess_073712ceb526e80a642cde7228d7e20e3be66a8534b69a601296856df41c2403": {
+      "userId": "usr_emp_1790780657070",
+      "createdAt": 1791656999159,
+      "expiresAt": 1791743399159,
+      "rememberMe": false
+    },
+    "mg_sess_d58550761662fd4c64b04c31e8284b8b08b19c39c493f14a7945d6743585819d": {
       "userId": "usr_admin",
-      "createdAt": 1791047628876,
-      "expiresAt": 1793639628876,
+      "createdAt": 1791657950009,
+      "expiresAt": 1794249950009,
       "rememberMe": true
     },
-    "mg_sess_08913e32c797fbd66d0278e4d9d36df69e29a45a727e51a4c3d3ac29a3e2bd64": {
-      "userId": "usr_admin",
-      "createdAt": 1791051175896,
-      "expiresAt": 1791137575896,
+    "mg_sess_44f82bbb631d4bfe44a412a677d76afdde185c4a12fe5a1409de7065c382dbf5": {
+      "userId": "usr_emp_1790780657070",
+      "createdAt": 1791662225417,
+      "expiresAt": 1791748625417,
       "rememberMe": false
     },
-    "mg_sess_0db259e79760fccc0119f01ecbd7ba2e5ad99306541aa3ddbafd8605374413ce": {
-      "userId": "usr_admin",
-      "createdAt": 1791051183132,
-      "expiresAt": 1791137583132,
-      "rememberMe": false
-    },
-    "mg_sess_9181aaecb35540f7039010dbc7d6901ff739327f041b12190a4d0730670783da": {
-      "userId": "usr_admin",
-      "createdAt": 1791051192505,
-      "expiresAt": 1791137592505,
+    "mg_sess_8b641fb9d30ccbb07945dd89c221c0db864813c5c51d87fa77cffbdf99dadd32": {
+      "userId": "usr_emp_1790780657070",
+      "createdAt": 1791662464103,
+      "expiresAt": 1791748864103,
       "rememberMe": false
     }
   },
-  "usedQrChallenges": {}
+  "usedQrChallenges": {},
+  "webauthnChallenges": {},
+  "webauthnCredentials": {
+    "usr_admin": [
+      {
+        "id": "bio_device_1791650452163",
+        "registeredAt": 1791650453332
+      },
+      {
+        "id": "bio_device_1791650732192",
+        "registeredAt": 1791650733387
+      }
+    ]
+  }
 }
